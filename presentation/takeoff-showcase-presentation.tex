@@ -67,7 +67,6 @@
   }
 
   \vspace{0.7em}
-  {\Large\bfseries Argue. \textcolor{Signal}{Adjudicate}. Commit.}
 \end{frame}
 \note{
   Start on the terminal replay if it is ready; this frame is the zero-network backup.
@@ -77,20 +76,25 @@
 }
 
 % -----------------------------------------------------------------------------
-\begin{frame}{The missing interface to AI 2027}
+\begin{frame}{Why TAKEOFF exists}
   \begin{columns}[c,onlytextwidth]
     \begin{column}{0.58\textwidth}
-      {\fontsize{30}{34}\selectfont\bfseries
-        4 hours.\\
-        8--14 people.\\
-        Skilled facilitation.}
+      {\fontsize{28}{32}\selectfont\bfseries
+        The AI 2027 team asked for\\
+        an online version.}
+
+      \vspace{0.8em}
+      \large
+      A 4-hour in-person exercise\\
+      for 8--14 players still needs\\
+      a skilled facilitator.
     \end{column}
     \begin{column}{0.38\textwidth}
       \terminalbox{%
         {\color{State}\mono{PUBLIC REQUEST}}\\[0.35em]
-        \mono{online AGI wargame}\\
-        \mono{LLM-driven characters}\\[0.35em]
-        {\color{Signal}\mono{millions of players}}
+        \mono{``help us make an online}\\
+        \mono{AGI wargame''}\\[0.35em]
+        {\color{Signal}\mono{LLM-driven characters}}
       }
     \end{column}
   \end{columns}
@@ -98,10 +102,10 @@
   \source{AI Futures Project, About; Vollmer, LessWrong (June 2025)}
 \end{frame}
 \note{
-  The AI Futures Project has run its in-person exercise about 35 times, including
-  participants from leading labs and congressional staff. In 2025 its COO publicly
-  asked for an online version with LLM-driven characters. TAKEOFF is an unaffiliated
-  prototype response: a facilitator-light way to explore the scenario.
+  This slide should feel like a response to an explicit request, not a generic pitch.
+  Keep the line simple: the AI 2027 team asked for an online AGI wargame, and
+  TAKEOFF is a prototype response. The left side gives the scale of the in-person
+  exercise; the right side makes the request concrete.
 }
 
 % -----------------------------------------------------------------------------
@@ -140,14 +144,14 @@
 \begin{frame}{One rule keeps the models honest}
   \centering
   \begin{tikzpicture}[
-    step/.style={draw=Muted!50,fill=TerminalPanel,minimum width=2.3cm,
+    flowstep/.style={draw=Muted!50,fill=TerminalPanel,minimum width=2.3cm,
       minimum height=1.0cm,align=center,font=\bfseries},
     arrow/.style={-Stealth,thick,draw=Signal}
   ]
-    \node[step] (argue) {ARGUE};
-    \node[step,right=0.55cm of argue] (judge) {ADJUDICATE};
-    \node[step,right=0.55cm of judge] (roll) {ROLL};
-    \node[step,right=0.55cm of roll] (commit) {COMMIT};
+    \node[flowstep] (argue) {ARGUE};
+    \node[flowstep,right=0.55cm of argue] (judge) {ADJUDICATE};
+    \node[flowstep,right=0.55cm of judge] (roll) {ROLL};
+    \node[flowstep,right=0.55cm of roll] (commit) {OUTCOME};
     \draw[arrow] (argue) -- (judge);
     \draw[arrow] (judge) -- (roll);
     \draw[arrow] (roll) -- (commit);
@@ -239,14 +243,6 @@
     \textcolor{Signal}{``this happens, for these reasons,''}\\[0.2em]
     you can play.}
 
-  \vspace{1.3em}
-  \terminalbox{%
-    {\color{Signal}\mono{ROADMAP}}\quad{\color{State}\mono{\$ takeoff --seat ALIGN}}\\
-    {\color{Muted}\mono{Your move.}}
-  }
-
-  \vspace{0.7em}
-  {\small\color{Muted}TAKEOFF \textbullet{} Rafael \textbullet{} unofficial AI 2027 project}
 \end{frame}
 \note{
   This hackathon lowers the barrier into AI safety. Engle's rule lowers the barrier
@@ -270,9 +266,6 @@
     \item Hogan and Brennen. ``Snow Globe: An LLM-Based Open-Ended Wargame.'' arXiv:2404.11446.
   \end{itemize}
 
-  \vfill
-  {\color{Signal}\mono{NOVELTY}} No public tool combines Engle-style matrix game
-  adjudication, LLM players, and an AI takeoff scenario.
 \end{frame}
 
 \end{document}

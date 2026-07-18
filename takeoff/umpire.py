@@ -1,6 +1,6 @@
 from dataclasses import dataclass
+import json
 import logging
-import re
 from typing import Protocol
 
 from pydantic import ValidationError
@@ -43,7 +43,9 @@ class LlmUmpire:
                     Adjudication,
                     "takeoff_umpire_adjudication",
                 )
-                adjudication = Adjudication.model_validate_json(content)
+                payload = json.loads(content)
+                _normalize_adjudication_payload(context, payload)
+                adjudication = Adjudication.model_validate(payload)
                 _validate_adjudication(context, adjudication)
                 return AdjudicationResult(adjudication, attempt)
             except (ValidationError, ModelOutputError, ValueError) as error:
@@ -59,6 +61,28 @@ class LlmUmpire:
             f"umpire response invalid after 2 attempts for {context.actor_id.value}: "
             + " | ".join(errors)
         )
+
+
+def _normalize_adjudication_payload(
+    context: UmpireContext, payload: object
+) -> None:
+    if not isinstance(payload, dict):
+        return
+    pro_strength = payload.get("pro_strength")
+    con_strength = payload.get("con_strength")
+    if isinstance(pro_strength, int) and isinstance(con_strength, int):
+        payload["net_mod"] = pro_strength - con_strength
+    for branch in ("new_facts_success", "new_facts_failure"):
+        changes = payload.get(branch)
+        if not isinstance(changes, list):
+            continue
+        for change in changes:
+            if not isinstance(change, dict) or change.get("operation") != "add":
+                continue
+            if change.get("visibility") == "public":
+                change["known_by"] = []
+            elif change.get("visibility") == "covert" and not change.get("known_by"):
+                change["known_by"] = [context.actor_id.value]
 
 
 def _validate_adjudication(
@@ -87,41 +111,26 @@ def _validate_adjudication(
         raise ValueError(
             "con_strength 3 requires at least two independently assessed cons"
         )
-    _validate_public_surface(context, adjudication)
     active_ids = {fact.id for fact in context.facts if fact.active}
+    actor_ids = {actor.id for actor in context.scenario.actors}
     for change in (
         *adjudication.new_facts_success,
         *adjudication.new_facts_failure,
     ):
+        if (
+            adjudication.visibility.value == "covert"
+            and change.operation == "add"
+            and change.visibility is not None
+            and change.visibility.value == "public"
+        ):
+            raise ValueError("covert adjudications may add only covert facts")
         if change.operation == "end" and change.fact_id not in active_ids:
             raise ValueError(f"cannot end inactive or unknown fact {change.fact_id}")
-
-
-def _validate_public_surface(
-    context: UmpireContext, adjudication: Adjudication
-) -> None:
-    hidden_facts = [
-        fact
-        for fact in context.facts
-        if fact.active and fact.visibility.value == "covert"
-    ]
-    public_texts = [adjudication.public_observation or ""]
-    if adjudication.visibility.value == "public":
-        public_texts.extend(item.claim for item in adjudication.cons)
-        public_texts.extend(
-            (adjudication.success_narration, adjudication.failure_narration)
-        )
-        public_texts.extend(
-            change.text or ""
-            for change in (
-                *adjudication.new_facts_success,
-                *adjudication.new_facts_failure,
+        unknown_sources = set(change.source_fact_ids) - active_ids
+        if unknown_sources:
+            raise ValueError(
+                "fact change source_fact_ids contain inactive or unknown facts: "
+                + ", ".join(sorted(unknown_sources))
             )
-            if change.operation == "add"
-        )
-    public_surface = "\n".join(public_texts).casefold()
-    for fact in hidden_facts:
-        if re.search(rf"\b{re.escape(fact.id.casefold())}\b", public_surface):
-            raise ValueError(f"public adjudication leaks hidden fact ID {fact.id}")
-        if fact.text.casefold() in public_surface:
-            raise ValueError(f"public adjudication leaks hidden fact text {fact.id}")
+        if not set(change.known_by).issubset(actor_ids):
+            raise ValueError("fact change known_by contains an unknown actor")

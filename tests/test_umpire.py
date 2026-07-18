@@ -9,10 +9,12 @@ from takeoff.models import (
     Adjudication,
     Argument,
     Fact,
+    FactChange,
     UmpireContext,
     Visibility,
 )
 from takeoff.openrouter import ModelOutputError, StructuredModelClient
+from takeoff.prompts import umpire_messages
 from takeoff.scenario import build_scenario
 from takeoff.umpire import LlmUmpire
 
@@ -57,6 +59,8 @@ def valid_adjudication(*, net_mod: int = 0) -> str:
                 {"claim": "Audit may miss deception", "rationale": "Coverage"},
                 {"claim": "Access is constrained", "rationale": "Operational"},
             ],
+            "public_action_summary": "ALIGN runs a bounded interpretability audit.",
+            "public_cons": ["The audit may miss deception.", "Access is constrained."],
             "pro_strength": 2,
             "pro_strength_rationale": "The prior anomaly and targeted follow-up are concrete.",
             "con_strength": 2,
@@ -64,14 +68,15 @@ def valid_adjudication(*, net_mod: int = 0) -> str:
             "net_mod": net_mod,
             "success_narration": "The audit isolated a reproducible anomaly.",
             "failure_narration": "The audit consumed scarce time and exposed no clear signal.",
+            "public_success_narration": "The audit isolated a reproducible anomaly.",
+            "public_failure_narration": "The audit consumed scarce time without a clear signal.",
             "new_facts_success": [
-                {"operation": "add", "fact_id": None, "text": "The audit isolated a reproducible anomaly."}
+                {"operation": "add", "fact_id": None, "text": "The audit isolated a reproducible anomaly.", "visibility": "public", "known_by": []}
             ],
             "new_facts_failure": [
-                {"operation": "add", "fact_id": None, "text": "The audit consumed scarce alignment-team time."}
+                {"operation": "add", "fact_id": None, "text": "The audit consumed scarce alignment-team time.", "visibility": "public", "known_by": []}
             ],
             "visibility": "public",
-            "public_observation": None,
         }
     )
 
@@ -84,30 +89,110 @@ def test_umpire_accepts_semantically_valid_adjudication() -> None:
     assert result.adjudication.pro_strength == 2
 
 
-def test_umpire_retries_bad_arithmetic_once() -> None:
-    client = FakeClient([valid_adjudication(net_mod=2), valid_adjudication()])
+def test_fact_change_schema_requires_visibility() -> None:
+    schema = FactChange.model_json_schema()
+
+    assert "visibility" in schema["required"]
+
+
+def test_umpire_prompt_reserves_other_players_actions_for_their_turns() -> None:
+    messages = umpire_messages(context())
+    system_prompt = " ".join(messages[0]["content"].split())
+    user_prompt = " ".join(messages[1]["content"].split())
+
+    assert "Preserve player agency across turns" in system_prompt
+    assert "actions taken only by the ACTING ACTOR or by NON-PLAYER ENTITIES" in system_prompt
+    assert "the CEO approved ALIGN's request" in system_prompt
+    assert "secret actions may be exposed automatically" in system_prompt
+    assert "does not count as another playable actor taking an action" in system_prompt
+    assert "Only ALIGN may take actions in this outcome" in user_prompt
+    assert "do not decide actions for any of the other four" in user_prompt
+
+
+def test_umpire_recomputes_bad_arithmetic_without_retry() -> None:
+    client = FakeClient([valid_adjudication(net_mod=2)])
 
     result = LlmUmpire(client).adjudicate(context())
 
-    assert client.calls == 2
-    assert result.attempts == 2
+    assert client.calls == 1
+    assert result.attempts == 1
+    assert result.adjudication.net_mod == 0
 
 
-def test_umpire_retries_public_adjudication_that_leaks_secret_fact() -> None:
+def test_umpire_normalizes_fact_audiences_without_retry() -> None:
+    payload = json.loads(valid_adjudication())
+    payload["new_facts_success"] = [
+        {
+            "operation": "add",
+            "fact_id": None,
+            "text": "A public finding was announced.",
+            "visibility": "public",
+            "known_by": ["ALIGN"],
+        },
+        {
+            "operation": "add",
+            "fact_id": None,
+            "text": "ALIGN privately retained supporting evidence.",
+            "visibility": "covert",
+            "known_by": [],
+        },
+    ]
+    client = FakeClient([json.dumps(payload)])
+
+    result = LlmUmpire(client).adjudicate(context())
+
+    public_fact, covert_fact = result.adjudication.new_facts_success
+    assert result.attempts == 1
+    assert public_fact.known_by == ()
+    assert covert_fact.known_by == (ActorId.ALIGN,)
+
+
+def test_umpire_allows_public_discovery_of_secret_fact() -> None:
     secret = Fact(
         id="F5",
         text="Agent-4 planted a concealed training-data trigger.",
         visibility=Visibility.COVERT,
-        owner=ActorId.AGENT4,
+        known_by=(ActorId.AGENT4,),
     )
     secret_context = context().model_copy(
         update={"facts": (*context().facts, secret)}
     )
-    leaking = json.loads(valid_adjudication())
-    leaking["cons"][0]["claim"] = "F5 may compromise the audit."
-    client = FakeClient([json.dumps(leaking), valid_adjudication()])
+    discovery = json.loads(valid_adjudication())
+    discovery["public_success_narration"] = "The audit publicly exposed F5."
+    discovery["new_facts_success"][0]["text"] = (
+        "The audit exposed Agent-4's concealed training-data trigger."
+    )
+    discovery["new_facts_success"][0]["source_fact_ids"] = ["F5"]
+    client = FakeClient([json.dumps(discovery)])
 
     result = LlmUmpire(client).adjudicate(secret_context)
+
+    assert result.attempts == 1
+    assert client.calls == 1
+    revealed = result.adjudication.new_facts_success[0]
+    assert revealed.visibility == Visibility.PUBLIC
+    assert revealed.source_fact_ids == ("F5",)
+    assert secret.visibility == Visibility.COVERT
+    assert secret.known_by == (ActorId.AGENT4,)
+
+
+def test_umpire_retries_unknown_discovery_source() -> None:
+    invalid = json.loads(valid_adjudication())
+    invalid["new_facts_success"][0]["source_fact_ids"] = ["F999"]
+    client = FakeClient([json.dumps(invalid), valid_adjudication()])
+
+    result = LlmUmpire(client).adjudicate(context())
+
+    assert result.attempts == 2
+    assert client.calls == 2
+
+
+def test_umpire_retries_public_fact_from_covert_adjudication() -> None:
+    invalid = json.loads(valid_adjudication())
+    invalid["visibility"] = "covert"
+    client = FakeClient([json.dumps(invalid), valid_adjudication()])
+
+    result = LlmUmpire(client).adjudicate(context())
 
     assert result.attempts == 2
     assert client.calls == 2

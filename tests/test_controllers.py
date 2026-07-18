@@ -155,7 +155,7 @@ def test_covert_fact_does_not_enter_other_actor_model_request() -> None:
         id="F5",
         text="UNIQUE-COVERT-SENTINEL",
         visibility=Visibility.COVERT,
-        owner=ActorId.AGENT4,
+        known_by=(ActorId.AGENT4,),
     )
     state = state.model_copy(update={"facts": {**state.facts, covert.id: covert}})
 

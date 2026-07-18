@@ -20,7 +20,7 @@ def visible_facts(
     return tuple(
         fact
         for fact in facts
-        if fact.visibility == Visibility.PUBLIC or fact.owner == audience
+        if fact.visibility == Visibility.PUBLIC or audience in fact.known_by
     )
 
 
@@ -62,7 +62,7 @@ def materialize_fact_changes(
     actor_id: ActorId,
     adjudication: Adjudication,
     success: bool,
-) -> tuple[tuple[Fact, ...], tuple[str, ...]]:
+) -> tuple[tuple[Fact, ...], tuple[str, ...], tuple[str, ...]]:
     changes = (
         adjudication.new_facts_success
         if success
@@ -74,26 +74,30 @@ def materialize_fact_changes(
     )
     added: list[Fact] = []
     ended: list[str] = []
+    public_ended: list[str] = []
+    active_ids = {fact.id for fact in state.facts.values() if fact.active}
     for change in changes:
         if change.operation == "end":
-            ended.append(change.fact_id or "")
+            fact_id = change.fact_id or ""
+            ended.append(fact_id)
+            fact = state.facts.get(fact_id)
+            if fact is not None and fact.visibility == Visibility.PUBLIC:
+                public_ended.append(fact_id)
             continue
+        unknown_sources = set(change.source_fact_ids) - active_ids
+        if unknown_sources:
+            raise ValueError(
+                "cannot source a fact from inactive or unknown facts: "
+                + ", ".join(sorted(unknown_sources))
+            )
         next_number += 1
         added.append(
             Fact(
                 id=f"F{next_number}",
                 text=change.text or "",
-                visibility=adjudication.visibility,
-                owner=(
-                    actor_id
-                    if adjudication.visibility == Visibility.COVERT
-                    else None
-                ),
+                visibility=change.visibility or Visibility.PUBLIC,
+                known_by=change.known_by,
+                source_fact_ids=change.source_fact_ids,
             )
         )
-    if adjudication.visibility == Visibility.COVERT and adjudication.public_observation:
-        next_number += 1
-        added.append(
-            Fact(id=f"F{next_number}", text=adjudication.public_observation)
-        )
-    return tuple(added), tuple(ended)
+    return tuple(added), tuple(ended), tuple(public_ended)

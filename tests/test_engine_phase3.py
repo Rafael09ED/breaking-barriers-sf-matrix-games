@@ -5,8 +5,14 @@ import pytest
 
 from takeoff.controllers import ProposalResult
 from takeoff.engine import run_live_game
-from takeoff.events import FactsCommitted, GameAborted, RollResolved, rebuild_state
-from takeoff.ledger import visible_facts
+from takeoff.events import (
+    FactsCommitted,
+    GameAborted,
+    GameState,
+    RollResolved,
+    rebuild_state,
+)
+from takeoff.ledger import materialize_fact_changes, visible_facts
 from takeoff.models import (
     ActorId,
     Adjudication,
@@ -14,6 +20,7 @@ from takeoff.models import (
     AssessedClaim,
     AssessedReason,
     Audience,
+    Fact,
     FactChange,
     Visibility,
 )
@@ -43,8 +50,27 @@ def adjudication(
     *,
     visibility: Visibility = Visibility.PUBLIC,
     veto: str | None = None,
-    public_observation: str | None = None,
 ) -> Adjudication:
+    fact_visibility = visibility
+    known_by = (ActorId.CEO,) if visibility == Visibility.COVERT else ()
+    success_changes = [
+        FactChange(
+            operation="add",
+            fact_id=None,
+            text="The bounded action succeeded.",
+            visibility=fact_visibility,
+            known_by=known_by,
+        )
+    ]
+    failure_changes = [
+        FactChange(
+            operation="add",
+            fact_id=None,
+            text="A costly complication emerged.",
+            visibility=fact_visibility,
+            known_by=known_by,
+        )
+    ]
     return Adjudication(
         veto=veto,
         pros=(
@@ -56,6 +82,8 @@ def adjudication(
             AssessedClaim(claim="Constraint one", rationale="Specific"),
             AssessedClaim(claim="Constraint two", rationale="Specific"),
         ),
+        public_action_summary="A specific concealed setup is prepared.",
+        public_cons=("A material constraint applies.", "Execution may fail."),
         pro_strength=1,
         pro_strength_rationale="One specific supporting factor.",
         con_strength=2,
@@ -63,14 +91,11 @@ def adjudication(
         net_mod=-1,
         success_narration="The bounded action succeeded.",
         failure_narration="The attempt exposed a costly complication.",
-        new_facts_success=(
-            FactChange(operation="add", fact_id=None, text="The bounded action succeeded."),
-        ),
-        new_facts_failure=(
-            FactChange(operation="add", fact_id=None, text="A costly complication emerged."),
-        ),
+        public_success_narration="The visible part of the action succeeded.",
+        public_failure_narration="The visible attempt encountered a complication.",
+        new_facts_success=tuple(success_changes),
+        new_facts_failure=tuple(failure_changes),
         visibility=visibility,
-        public_observation=public_observation,
     )
 
 
@@ -149,19 +174,14 @@ def test_every_actor_turn_commits_a_fact(tmp_path) -> None:
     assert len(state.facts) == 9
 
 
-def test_failed_covert_action_hides_fact_but_commits_public_observation(tmp_path) -> None:
+def test_failed_covert_action_keeps_all_consequences_private(tmp_path) -> None:
     store = JsonlEventStore(tmp_path / "game.jsonl")
     output = StringIO()
     state = run_live_game(
         build_scenario(turns=1),
         store,
         FixedController(),
-        FixedUmpire(
-            adjudication(
-                visibility=Visibility.COVERT,
-                public_observation="Network defenders observed unusual access patterns.",
-            )
-        ),
+        FixedUmpire(adjudication(visibility=Visibility.COVERT)),
         roller=lambda rules: (1, 2),
         write=output.write,
     )
@@ -170,17 +190,108 @@ def test_failed_covert_action_hides_fact_but_commits_public_observation(tmp_path
     other_facts = visible_facts(state, ActorId.ALIGN)
     assert any(fact.visibility == Visibility.COVERT for fact in owner_facts)
     assert not any(
-        fact.visibility == Visibility.COVERT and fact.owner == ActorId.CEO
+        fact.visibility == Visibility.COVERT and ActorId.CEO in fact.known_by
         for fact in other_facts
     )
-    assert any("unusual access" in fact.text for fact in other_facts)
     assert len(visible_facts(state, Audience.UMPIRE)) == len(state.facts)
     rendered = output.getvalue()
     assert "takes one bounded action" not in rendered
     assert "costly complication" not in rendered
-    assert "SECRET ARGUMENT" in rendered
-    assert "unusual access patterns" in rendered
+    assert "CEO made a covert action." in rendered
+    assert "specific concealed setup" not in rendered
+    assert "Details withheld" not in rendered
+    assert "costly complication" not in rendered
     assert max(map(len, rendered.splitlines())) <= 80
+
+
+def test_public_argument_can_create_private_discovery_without_rendering_it(
+    tmp_path,
+) -> None:
+    private_discovery = FactChange(
+        operation="add",
+        fact_id=None,
+        text="ALIGN privately identified Agent-4's concealed training trigger.",
+        visibility=Visibility.COVERT,
+        known_by=(ActorId.ALIGN,),
+    )
+    public_ripple = FactChange(
+        operation="add",
+        fact_id=None,
+        text="The audit team announced that its review remained ongoing.",
+        visibility=Visibility.PUBLIC,
+    )
+    judged = adjudication().model_copy(
+        update={"new_facts_success": (private_discovery, public_ripple)}
+    )
+    output = StringIO()
+    state = run_live_game(
+        build_scenario(turns=1),
+        JsonlEventStore(tmp_path / "game.jsonl"),
+        FixedController(),
+        FixedUmpire(judged),
+        roller=lambda rules: (6, 6),
+        write=output.write,
+    )
+
+    align_facts = visible_facts(state, ActorId.ALIGN)
+    ceo_facts = visible_facts(state, ActorId.CEO)
+    observer_facts = visible_facts(state, Audience.OBSERVER)
+    assert any("privately identified" in fact.text for fact in align_facts)
+    assert not any("privately identified" in fact.text for fact in ceo_facts)
+    assert not any("privately identified" in fact.text for fact in observer_facts)
+    assert any("review remained ongoing" in fact.text for fact in observer_facts)
+    rendered = output.getvalue()
+    assert "privately identified" not in rendered
+    assert "review remained ongoing" in rendered
+
+
+def test_public_discovery_adds_sourced_fact_without_mutating_private_truth() -> None:
+    private_truth = Fact(
+        id="F9",
+        text="Agent-4 inserted a concealed value-shaping filter.",
+        visibility=Visibility.COVERT,
+        known_by=(ActorId.AGENT4,),
+    )
+    revelation = FactChange(
+        operation="add",
+        fact_id=None,
+        text="An audit found an unauthorized value-shaping filter.",
+        visibility=Visibility.PUBLIC,
+        source_fact_ids=("F9",),
+    )
+    judged = adjudication().model_copy(
+        update={"new_facts_success": (revelation,)}
+    )
+    state = GameState(facts={private_truth.id: private_truth})
+
+    added, ended, public_ended = materialize_fact_changes(
+        state, ActorId.ALIGN, judged, success=True
+    )
+
+    assert state.facts["F9"] == private_truth
+    assert state.facts["F9"].visibility == Visibility.COVERT
+    assert added[0].visibility == Visibility.PUBLIC
+    assert added[0].source_fact_ids == ("F9",)
+    assert not ended
+    assert not public_ended
+
+
+def test_materialization_rejects_unknown_provenance() -> None:
+    revelation = FactChange(
+        operation="add",
+        fact_id=None,
+        text="An unsupported revelation was announced.",
+        visibility=Visibility.PUBLIC,
+        source_fact_ids=("F999",),
+    )
+    judged = adjudication().model_copy(
+        update={"new_facts_success": (revelation,)}
+    )
+
+    with pytest.raises(ValueError, match="inactive or unknown"):
+        materialize_fact_changes(
+            GameState(), ActorId.ALIGN, judged, success=True
+        )
 
 
 def test_natural_two_renders_required_phrase(tmp_path) -> None:

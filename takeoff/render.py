@@ -84,7 +84,9 @@ def render_event(event: GameEvent) -> str:
 
     if isinstance(event, FactsCommitted):
         lines = [_fact_line("+", fact.id, fact.text) for fact in event.added]
-        lines.extend(_fact_line("-", fact_id, "ended") for fact_id in event.ended)
+        lines.extend(
+            _fact_line("-", fact_id, "ended") for fact_id in event.public_ended
+        )
         return "\n".join(lines)
 
     return render_argument(event)
@@ -152,17 +154,15 @@ def render_turn_resolution(
         public_facts = [
             fact for fact in facts.added if fact.visibility == Visibility.PUBLIC
         ]
-        lines = [
-            f"  {argument.actor_id.value} SECRET ARGUMENT",
-            "    A specific concealed setup is established for a later effect.",
-            "    Details withheld pending discovery.",
-        ]
+        lines = [f"  {argument.actor_id.value} made a covert action."]
         if roll:
             lines.append(_render_roll(roll))
         lines.extend(_fact_line("+", fact.id, fact.text) for fact in public_facts)
         return "\n\n".join(lines)
 
-    cons = "\n".join(_line(item.claim, "    - ", "      ") for item in adjudication.cons)
+    cons = "\n".join(
+        _line(claim, "    - ", "      ") for claim in adjudication.public_cons
+    )
     lines = [
         render_argument(argument, adjudication_event),
         f"  UMPIRE  support {adjudication.pro_strength} | opposition "
@@ -171,8 +171,14 @@ def render_turn_resolution(
     ]
     if roll:
         lines.extend((_render_roll(roll), _line(roll.narration, "  OUTCOME  ", "           ")))
-    lines.extend(_fact_line("+", fact.id, fact.text) for fact in facts.added)
-    lines.extend(_fact_line("-", fact_id, "ended") for fact_id in facts.ended)
+    lines.extend(
+        _fact_line("+", fact.id, fact.text)
+        for fact in facts.added
+        if fact.visibility == Visibility.PUBLIC
+    )
+    lines.extend(
+        _fact_line("-", fact_id, "ended") for fact_id in facts.public_ended
+    )
     return "\n\n".join(lines)
 
 

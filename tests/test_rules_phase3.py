@@ -21,6 +21,8 @@ def adjudication(net_mod: int = 0) -> Adjudication:
             AssessedClaim(claim="con 1", rationale="specific"),
             AssessedClaim(claim="con 2", rationale="specific"),
         ),
+        public_action_summary="A bounded action is attempted.",
+        public_cons=("con 1", "con 2"),
         pro_strength=2,
         pro_strength_rationale="Concrete support.",
         con_strength=2,
@@ -28,10 +30,11 @@ def adjudication(net_mod: int = 0) -> Adjudication:
         net_mod=net_mod,
         success_narration="Success changed the situation.",
         failure_narration="Failure created a complication.",
-        new_facts_success=(FactChange(operation="add", fact_id=None, text="Success happened."),),
-        new_facts_failure=(FactChange(operation="add", fact_id=None, text="A complication emerged."),),
+        public_success_narration="Success changed the situation.",
+        public_failure_narration="Failure created a complication.",
+        new_facts_success=(FactChange(operation="add", fact_id=None, text="Success happened.", visibility=Visibility.PUBLIC),),
+        new_facts_failure=(FactChange(operation="add", fact_id=None, text="A complication emerged.", visibility=Visibility.PUBLIC),),
         visibility=Visibility.PUBLIC,
-        public_observation=None,
     )
 
 

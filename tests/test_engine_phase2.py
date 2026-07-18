@@ -58,6 +58,8 @@ class PassUmpire:
                     AssessedClaim(claim="Constraint one", rationale="Limited"),
                     AssessedClaim(claim="Constraint two", rationale="Limited"),
                 ),
+                public_action_summary="The actor takes a bounded action.",
+                public_cons=("Constraint one", "Constraint two"),
                 pro_strength=1,
                 pro_strength_rationale="One specific supporting factor.",
                 con_strength=0,
@@ -65,14 +67,15 @@ class PassUmpire:
                 net_mod=len(context.argument.reasons),
                 success_narration="The bounded action advanced.",
                 failure_narration="The attempt created a complication.",
+                public_success_narration="The bounded action advanced.",
+                public_failure_narration="The attempt created a complication.",
                 new_facts_success=(
-                    FactChange(operation="add", fact_id=None, text="The bounded action advanced."),
+                    FactChange(operation="add", fact_id=None, text="The bounded action advanced.", visibility=Visibility.PUBLIC),
                 ),
                 new_facts_failure=(
-                    FactChange(operation="add", fact_id=None, text="A complication emerged."),
+                    FactChange(operation="add", fact_id=None, text="A complication emerged.", visibility=Visibility.PUBLIC),
                 ),
                 visibility=Visibility.PUBLIC,
-                public_observation=None,
             ),
             attempts=1,
         )

@@ -84,6 +84,7 @@ class FactsCommitted(EventBase):
     actor_id: ActorId
     added: tuple[Fact, ...]
     ended: tuple[str, ...]
+    public_ended: tuple[str, ...]
 
 
 class GameAborted(EventBase):

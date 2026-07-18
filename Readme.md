@@ -46,8 +46,26 @@ default. Secret arguments are limited to specific concealed setups whose materia
 effect is delayed beyond the current turn; broad policy, internal programs,
 generic intelligence work, and immediate effects stay public. The engine buffers
 the proposal until adjudication, so a secret argument is never printed before the
-classification. Public adjudications are rejected if their cons, narration,
-observations, or facts directly expose an existing secret fact.
+classification. The umpire separately writes public-safe summaries, cons, and
+narrations, and chooses visibility plus `known_by` for every resulting fact.
+Successful discovery may reveal a fact publicly or privately inform one or more
+actors. Code does not second-guess that semantic judgment: it validates audience
+structure, filters each player's ledger by `known_by`, and never renders covert
+facts in public output.
+
+Private truth remains append-only. A discovery or conflicting public reason never
+changes an existing covert fact's visibility. Instead, the umpire creates a new
+public or private fact with `source_fact_ids` identifying the active facts that
+support the revelation. This provenance remains in the privileged transcript and
+is omitted from player prompts and console rendering. Covert adjudications may
+add only covert facts; public knowledge must arise in a later public adjudication.
+
+Umpire outcomes preserve seat agency: narrations and new facts may describe
+actions only by the acting player or by non-player entities such as courts,
+agencies, employees, markets, media, infrastructure, and automated systems.
+Other player seats may be affected or receive something, but their decisions and
+responses wait for their own turns. This is a semantic umpire rule rather than a
+brittle actor-name parser in code.
 
 Console rendering wraps at 80 columns and separates the argument, risks, roll,
 result, outcome, and fact changes into stable blocks. `Ctrl-C` records a clean

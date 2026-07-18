@@ -43,15 +43,20 @@ class Fact(StrictModel):
     id: str
     text: str
     visibility: Visibility = Visibility.PUBLIC
-    owner: ActorId | None = None
+    known_by: tuple[ActorId, ...] = ()
+    source_fact_ids: tuple[str, ...] = ()
     active: bool = True
 
     @model_validator(mode="after")
-    def validate_owner(self) -> "Fact":
-        if self.visibility == Visibility.COVERT and self.owner is None:
-            raise ValueError("covert facts require an owner")
-        if self.visibility == Visibility.PUBLIC and self.owner is not None:
-            raise ValueError("public facts cannot have an owner")
+    def validate_audience(self) -> "Fact":
+        if self.visibility == Visibility.COVERT and not self.known_by:
+            raise ValueError("covert facts require at least one informed actor")
+        if self.visibility == Visibility.PUBLIC and self.known_by:
+            raise ValueError("public facts cannot restrict their audience")
+        if len(set(self.known_by)) != len(self.known_by):
+            raise ValueError("known_by cannot contain duplicate actors")
+        if len(set(self.source_fact_ids)) != len(self.source_fact_ids):
+            raise ValueError("source_fact_ids cannot contain duplicates")
         return self
 
 
@@ -115,13 +120,31 @@ class FactChange(StrictModel):
     operation: Literal["add", "end"]
     fact_id: str | None
     text: str | None
+    visibility: Visibility | None
+    known_by: tuple[ActorId, ...] = ()
+    source_fact_ids: tuple[str, ...] = ()
 
     @model_validator(mode="after")
     def validate_operation(self) -> "FactChange":
-        if self.operation == "add" and (self.fact_id is not None or not self.text):
-            raise ValueError("add changes require text and no fact_id")
-        if self.operation == "end" and (not self.fact_id or self.text is not None):
-            raise ValueError("end changes require fact_id and no text")
+        if self.operation == "add":
+            if self.fact_id is not None or not self.text or self.visibility is None:
+                raise ValueError("add changes require text, visibility, and no fact_id")
+            if self.visibility == Visibility.COVERT and not self.known_by:
+                raise ValueError("covert additions require at least one informed actor")
+            if self.visibility == Visibility.PUBLIC and self.known_by:
+                raise ValueError("public additions cannot restrict their audience")
+            if len(set(self.known_by)) != len(self.known_by):
+                raise ValueError("known_by cannot contain duplicate actors")
+            if len(set(self.source_fact_ids)) != len(self.source_fact_ids):
+                raise ValueError("source_fact_ids cannot contain duplicates")
+        if self.operation == "end" and (
+            not self.fact_id
+            or self.text is not None
+            or self.visibility is not None
+            or self.known_by
+            or self.source_fact_ids
+        ):
+            raise ValueError("end changes require only fact_id")
         return self
 
 
@@ -129,6 +152,8 @@ class Adjudication(StrictModel):
     veto: str | None
     pros: tuple[AssessedReason, ...]
     cons: tuple[AssessedClaim, ...] = Field(min_length=2, max_length=4)
+    public_action_summary: str
+    public_cons: tuple[str, ...] = Field(min_length=2, max_length=4)
     pro_strength: int = Field(ge=0, le=3)
     pro_strength_rationale: str
     con_strength: int = Field(ge=0, le=3)
@@ -136,10 +161,23 @@ class Adjudication(StrictModel):
     net_mod: int = Field(ge=-3, le=3)
     success_narration: str
     failure_narration: str
+    public_success_narration: str
+    public_failure_narration: str
     new_facts_success: tuple[FactChange, ...] = Field(min_length=1)
     new_facts_failure: tuple[FactChange, ...] = Field(min_length=1)
     visibility: Visibility
-    public_observation: str | None
+
+    @model_validator(mode="after")
+    def validate_covert_consequences(self) -> "Adjudication":
+        if self.visibility == Visibility.COVERT:
+            changes = (*self.new_facts_success, *self.new_facts_failure)
+            if any(
+                change.operation == "add"
+                and change.visibility == Visibility.PUBLIC
+                for change in changes
+            ):
+                raise ValueError("covert adjudications may add only covert facts")
+        return self
 
 
 class UmpireContext(StrictModel):

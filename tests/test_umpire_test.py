@@ -28,6 +28,8 @@ class ProbeUmpire:
                     AssessedClaim(claim="Con one", rationale="Probe"),
                     AssessedClaim(claim="Con two", rationale="Probe"),
                 ),
+                public_action_summary="A bounded probe is attempted.",
+                public_cons=("Con one", "Con two"),
                 pro_strength=weight,
                 pro_strength_rationale="Probe support.",
                 con_strength=2,
@@ -35,14 +37,15 @@ class ProbeUmpire:
                 net_mod=weight - 2,
                 success_narration="Success.",
                 failure_narration="A complication emerged.",
+                public_success_narration="Success.",
+                public_failure_narration="A complication emerged.",
                 new_facts_success=(
-                    FactChange(operation="add", fact_id=None, text="Success occurred."),
+                    FactChange(operation="add", fact_id=None, text="Success occurred.", visibility=Visibility.PUBLIC),
                 ),
                 new_facts_failure=(
-                    FactChange(operation="add", fact_id=None, text="A complication emerged."),
+                    FactChange(operation="add", fact_id=None, text="A complication emerged.", visibility=Visibility.PUBLIC),
                 ),
                 visibility=Visibility.PUBLIC,
-                public_observation=None,
             ),
             attempts=1,
         )

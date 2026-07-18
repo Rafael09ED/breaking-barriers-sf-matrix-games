@@ -7,6 +7,7 @@ from takeoff.controllers import ProposalResult
 from takeoff.engine import run_live_game
 from takeoff.events import (
     ArgumentProposed,
+    FactsCommitted,
     GameStarted,
     GameState,
     TurnStarted,
@@ -23,7 +24,7 @@ from takeoff.models import (
     FactChange,
     Visibility,
 )
-from takeoff.render import render_events
+from takeoff.render import render_event, render_events
 from takeoff.rules import rotating_order
 from takeoff.scenario import build_scenario
 from takeoff.transcript import JsonlEventStore
@@ -61,6 +62,8 @@ class EchoUmpire:
                     AssessedClaim(claim="Constraint one", rationale="Limited"),
                     AssessedClaim(claim="Constraint two", rationale="Limited"),
                 ),
+                public_action_summary="The actor takes a bounded action.",
+                public_cons=("Constraint one", "Constraint two"),
                 pro_strength=1,
                 pro_strength_rationale="One specific supporting factor.",
                 con_strength=0,
@@ -68,14 +71,15 @@ class EchoUmpire:
                 net_mod=len(context.argument.reasons),
                 success_narration="The action advanced.",
                 failure_narration="The action created a complication.",
+                public_success_narration="The action advanced.",
+                public_failure_narration="The action created a complication.",
                 new_facts_success=(
-                    FactChange(operation="add", fact_id=None, text="The action advanced."),
+                    FactChange(operation="add", fact_id=None, text="The action advanced.", visibility=Visibility.PUBLIC),
                 ),
                 new_facts_failure=(
-                    FactChange(operation="add", fact_id=None, text="A complication emerged."),
+                    FactChange(operation="add", fact_id=None, text="A complication emerged.", visibility=Visibility.PUBLIC),
                 ),
                 visibility=Visibility.PUBLIC,
-                public_observation=None,
             ),
             attempts=1,
         )
@@ -175,13 +179,13 @@ def test_live_render_matches_transcript_render(tmp_path) -> None:
     assert replay_state.actor_order[0] == ActorId.ALIGN
 
 
-def test_covert_fact_is_visible_only_to_owner_and_umpire() -> None:
+def test_covert_fact_is_visible_only_to_informed_actors_and_umpire() -> None:
     public = Fact(id="F1", text="Public fact")
     covert = Fact(
         id="F2",
         text="Sentinel covert fact",
         visibility=Visibility.COVERT,
-        owner=ActorId.AGENT4,
+        known_by=(ActorId.AGENT4,),
     )
     state = GameState(facts={public.id: public, covert.id: covert})
 
@@ -191,6 +195,38 @@ def test_covert_fact_is_visible_only_to_owner_and_umpire() -> None:
     assert visible_facts(state, Audience.OBSERVER) == (public,)
 
 
-def test_covert_fact_requires_owner() -> None:
-    with pytest.raises(ValueError, match="covert facts require an owner"):
+def test_covert_fact_can_be_shared_with_multiple_informed_actors() -> None:
+    shared = Fact(
+        id="F1",
+        text="ALIGN privately briefed POTUS on the discovered setup.",
+        visibility=Visibility.COVERT,
+        known_by=(ActorId.ALIGN, ActorId.POTUS),
+    )
+    state = GameState(facts={shared.id: shared})
+
+    assert visible_facts(state, ActorId.ALIGN) == (shared,)
+    assert visible_facts(state, ActorId.POTUS) == (shared,)
+    assert visible_facts(state, ActorId.CEO) == ()
+    assert visible_facts(state, Audience.OBSERVER) == ()
+
+
+def test_fact_commit_renders_only_public_ended_ids() -> None:
+    event = FactsCommitted(
+        game_id=uuid4(),
+        seq=1,
+        turn=1,
+        actor_id=ActorId.ALIGN,
+        added=(),
+        ended=("F_PUBLIC", "F_SECRET"),
+        public_ended=("F_PUBLIC",),
+    )
+
+    rendered = render_event(event)
+
+    assert "F_PUBLIC" in rendered
+    assert "F_SECRET" not in rendered
+
+
+def test_covert_fact_requires_informed_actor() -> None:
+    with pytest.raises(ValueError, match="at least one informed actor"):
         Fact(id="F1", text="Unowned secret", visibility=Visibility.COVERT)

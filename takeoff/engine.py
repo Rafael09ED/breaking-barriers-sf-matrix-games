@@ -129,9 +129,9 @@ def run_live_game(
                         roller,
                     )
                     narration = (
-                        judged.adjudication.success_narration
+                        judged.adjudication.public_success_narration
                         if outcome.success
-                        else judged.adjudication.failure_narration
+                        else judged.adjudication.public_failure_narration
                     )
                     roll_event = RollResolved(
                         game_id=game_id,
@@ -143,7 +143,7 @@ def run_live_game(
                     )
                     commit(roll_event, display=False)
                     seq += 1
-                    added, ended = materialize_fact_changes(
+                    added, ended, public_ended = materialize_fact_changes(
                         state, actor_id, judged.adjudication, outcome.success
                     )
                     facts_event = FactsCommitted(
@@ -153,6 +153,7 @@ def run_live_game(
                         actor_id=actor_id,
                         added=added,
                         ended=ended,
+                        public_ended=public_ended,
                     )
                     commit(facts_event, display=False)
                     seq += 1
