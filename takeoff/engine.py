@@ -8,6 +8,7 @@ from takeoff.events import (
     ArgumentProposed,
     ArgumentVetoed,
     FactsCommitted,
+    FactEvaluationRecorded,
     GameAborted,
     GameEvent,
     GameStarted,
@@ -19,7 +20,9 @@ from takeoff.events import (
 from takeoff.controllers import Controller
 from takeoff.ledger import (
     build_player_context,
+    build_fact_evaluation_context,
     build_umpire_context,
+    materialize_evaluated_fact,
     materialize_fact_changes,
 )
 from takeoff.models import Scenario
@@ -67,6 +70,55 @@ def run_live_game(
             )
         )
         seq += 1
+        due_facts = sorted(
+            (
+                fact
+                for fact in state.facts.values()
+                if fact.active
+                and fact.trigger_evaluation_at == turn
+                and (fact.id, turn) not in state.evaluated_triggers
+            ),
+            key=lambda fact: (
+                (0, int(fact.id[1:]))
+                if fact.id.startswith("F") and fact.id[1:].isdigit()
+                else (1, fact.id)
+            ),
+        )
+        for trigger_fact in due_facts:
+            try:
+                evaluated = umpire.evaluate_trigger(
+                    build_fact_evaluation_context(state, trigger_fact)
+                )
+                added_fact = materialize_evaluated_fact(
+                    state, evaluated.evaluation
+                )
+                commit(
+                    FactEvaluationRecorded(
+                        game_id=game_id,
+                        seq=seq,
+                        turn=turn,
+                        trigger_fact_id=trigger_fact.id,
+                        rationale=evaluated.evaluation.rationale,
+                        added_fact=added_fact,
+                        attempts=evaluated.attempts,
+                    )
+                )
+                seq += 1
+            except (ModelTransportError, ModelOutputError) as error:
+                error_kind = (
+                    "OpenRouter request failed"
+                    if isinstance(error, ModelTransportError)
+                    else "Model response failed"
+                )
+                logger.error("%s: %s", error_kind, error)
+                commit(
+                    GameAborted(
+                        game_id=game_id,
+                        seq=seq,
+                        reason=f"{error_kind}: {error}",
+                    )
+                )
+                raise
         for actor_id in order:
             try:
                 resolved = False

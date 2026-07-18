@@ -4,6 +4,8 @@ from takeoff.models import (
     Adjudication,
     Audience,
     Fact,
+    FactEvaluationContext,
+    FactEvaluationResult,
     PlayerContext,
     UmpireContext,
     Visibility,
@@ -57,6 +59,40 @@ def build_umpire_context(
     )
 
 
+def build_fact_evaluation_context(
+    state: GameState, trigger_fact: Fact
+) -> FactEvaluationContext:
+    if state.scenario is None or state.current_turn < 1:
+        raise ValueError("an active game turn is required to evaluate a fact")
+    return FactEvaluationContext(
+        scenario=state.scenario,
+        turn=state.current_turn,
+        trigger_fact=trigger_fact,
+        facts=visible_facts(state, Audience.UMPIRE),
+    )
+
+
+def materialize_evaluated_fact(
+    state: GameState, evaluation: FactEvaluationResult
+) -> Fact | None:
+    change = evaluation.new_fact
+    if change is None:
+        return None
+    next_number = max(
+        (int(fact_id[1:]) for fact_id in state.facts if fact_id[1:].isdigit()),
+        default=0,
+    ) + 1
+    return Fact(
+        id=f"F{next_number}",
+        text=change.text,
+        visibility=change.visibility,
+        known_by=change.known_by,
+        source_fact_ids=change.source_fact_ids,
+        supersedes_fact_ids=change.supersedes_fact_ids,
+        trigger_evaluation_at=change.trigger_evaluation_at,
+    )
+
+
 def materialize_fact_changes(
     state: GameState,
     actor_id: ActorId,
@@ -98,6 +134,8 @@ def materialize_fact_changes(
                 visibility=change.visibility or Visibility.PUBLIC,
                 known_by=change.known_by,
                 source_fact_ids=change.source_fact_ids,
+                supersedes_fact_ids=change.supersedes_fact_ids,
+                trigger_evaluation_at=change.trigger_evaluation_at,
             )
         )
     return tuple(added), tuple(ended), tuple(public_ended)

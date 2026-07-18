@@ -1,4 +1,9 @@
-from takeoff.models import PlayerContext, UmpireContext, Visibility
+from takeoff.models import (
+    FactEvaluationContext,
+    PlayerContext,
+    UmpireContext,
+    Visibility,
+)
 
 
 PLAYER_SYSTEM_PROMPT = """You are a player in TAKEOFF, a matrix game.
@@ -8,8 +13,11 @@ grounded in the established situation. The action must contain one main verb and
 one operational objective. Do not combine actions with "and", "while",
 "simultaneously", or separate clauses that would have independent success
 criteria. Choose the single most important step; later turns can handle follow-up
-work. Do not adjudicate success, roll dice, or directly negate an established
-fact. Set spend_fail_chit_on_failure to true only
+work. Let private doctrine and objectives guide strategy, but write the action,
+result, and reasons as claims the actor could safely state to the action's
+intended audience. Never quote or reveal private doctrine, hidden objectives,
+hidden alignment status, or covert fact IDs. Do not adjudicate success, roll
+dice, or directly negate an established fact. Set spend_fail_chit_on_failure to true only
 when you hold a fail chit and this action is important enough to reroll once.
 Return only the requested JSON object."""
 
@@ -103,8 +111,12 @@ public_success_narration/public_failure_narration before dice are rolled. A
 public narration may reveal a discovered secret when your judgment says the
 action exposed it; otherwise keep protected details out. Failure must change the
 situation through a cost, exposure, complication, or changed opportunity, never
-merely say that success did not occur. Large undertakings resolve as stage k of
-at most 3, not all at once.
+merely say that success did not occur. A failure branch may establish that an
+attempt or preparation occurred, but must not establish the intended result or
+the core success fact. A success branch must materially achieve the intended
+result; if the undertaking is too large, resolve it explicitly as stage k of at
+most 3 rather than claiming the whole undertaking succeeded. Roll severity
+changes the force of the selected branch, never which branch is true.
 
 Preserve player agency across turns. In success_narration, failure_narration,
 public_success_narration, public_failure_narration, and every added fact, describe
@@ -127,7 +139,10 @@ visibility. Public facts use known_by=[] and enter every actor's ledger. Covert
 facts list every actor who knows them in known_by. Include the acting actor when
 they created or directly witnessed the fact. This is also the discovery
 mechanic: a successful investigation can add a public revelation or a covert
-fact known only to the investigator.
+fact known only to the investigator. Never add a fact that duplicates an active
+fact or another fact in the same branch after ignoring case, whitespace, Unicode
+presentation differences, and terminal punctuation. Add only genuinely new
+state rather than paraphrasing an existing institutional position.
 
 Private truth is append-only: never change a covert fact to public and never end
 it merely because it was discovered. When an action discovers, exposes, or
@@ -144,6 +159,12 @@ text set, and source_fact_ids set. To end an active fact
 use operation=end, its fact_id, text=null, visibility=null, and known_by=[], but
 only when that fact's proposition becomes false. Partial progress or incomplete
 disclosure adds a new fact and does not end the unresolved fact.
+
+Set trigger_evaluation_at only for a fact whose status genuinely requires a
+fresh umpire judgment at a specific later turn, such as a temporary order or a
+scheduled review. It must be later than the current turn and within this game.
+Use supersedes_fact_ids only when the new fact establishes a later controlling
+status while preserving the earlier facts as history.
 
 Visibility defaults to public. Mark an argument covert only when it establishes
 one specific concealed thing or event whose material effect is delayed beyond
@@ -232,4 +253,57 @@ def corrective_umpire_messages(
                 f"{error}. Return one corrected JSON object only."
             ),
         },
+    ]
+
+
+FACT_EVALUATION_SYSTEM_PROMPT = """You are the impartial umpire reevaluating one
+scheduled fact in TAKEOFF. This is not an automatic expiration. Compare the
+triggering fact with the complete current ledger. Return new_fact=null when the
+ledger does not establish a materially new status. Otherwise append exactly one
+concise fact describing the current status.
+
+Never delete or mutate an earlier fact. A new fact may list earlier facts in
+supersedes_fact_ids when it establishes the later controlling status; those
+earlier facts remain historical truth. source_fact_ids must include the
+triggering fact and every active fact needed to support the judgment. Do not
+repeat an active fact after ignoring case, whitespace, Unicode presentation, and
+terminal punctuation.
+
+Preserve secrecy. A covert triggering fact remains covert unless other current
+facts independently establish a public revelation. A covert result lists every
+informed actor in known_by; a public result uses known_by=[]. A new fact may set
+trigger_evaluation_at to one later turn within this game, or null when no further
+review is needed. Return only the requested JSON object."""
+
+
+def fact_evaluation_messages(
+    context: FactEvaluationContext,
+) -> list[dict[str, str]]:
+    facts = "\n".join(
+        f"[{fact.id}] {fact.text} "
+        f"(visibility={fact.visibility.value}, "
+        f"known_by={','.join(actor.value for actor in fact.known_by) or 'all'})"
+        for fact in context.facts
+        if fact.active
+    )
+    prompt = f"""SCENARIO PURPOSE
+{context.scenario.purpose}
+
+SHARED BRIEFING
+{context.scenario.briefing}
+
+TURN {context.turn} OF {context.scenario.rules.turns}
+
+TRIGGERING FACT
+[{context.trigger_fact.id}] {context.trigger_fact.text}
+visibility={context.trigger_fact.visibility.value}
+known_by={','.join(actor.value for actor in context.trigger_fact.known_by) or 'all'}
+
+COMPLETE PRIVILEGED ACTIVE LEDGER
+{facts or 'None'}
+
+Determine whether the ledger establishes a materially new status."""
+    return [
+        {"role": "system", "content": FACT_EVALUATION_SYSTEM_PROMPT},
+        {"role": "user", "content": prompt},
     ]

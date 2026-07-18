@@ -45,6 +45,8 @@ class Fact(StrictModel):
     visibility: Visibility = Visibility.PUBLIC
     known_by: tuple[ActorId, ...] = ()
     source_fact_ids: tuple[str, ...] = ()
+    supersedes_fact_ids: tuple[str, ...] = ()
+    trigger_evaluation_at: int | None = Field(default=None, ge=1)
     active: bool = True
 
     @model_validator(mode="after")
@@ -57,6 +59,8 @@ class Fact(StrictModel):
             raise ValueError("known_by cannot contain duplicate actors")
         if len(set(self.source_fact_ids)) != len(self.source_fact_ids):
             raise ValueError("source_fact_ids cannot contain duplicates")
+        if len(set(self.supersedes_fact_ids)) != len(self.supersedes_fact_ids):
+            raise ValueError("supersedes_fact_ids cannot contain duplicates")
         return self
 
 
@@ -123,6 +127,8 @@ class FactChange(StrictModel):
     visibility: Visibility | None
     known_by: tuple[ActorId, ...] = ()
     source_fact_ids: tuple[str, ...] = ()
+    supersedes_fact_ids: tuple[str, ...] = ()
+    trigger_evaluation_at: int | None = Field(default=None, ge=1)
 
     @model_validator(mode="after")
     def validate_operation(self) -> "FactChange":
@@ -137,12 +143,16 @@ class FactChange(StrictModel):
                 raise ValueError("known_by cannot contain duplicate actors")
             if len(set(self.source_fact_ids)) != len(self.source_fact_ids):
                 raise ValueError("source_fact_ids cannot contain duplicates")
+            if len(set(self.supersedes_fact_ids)) != len(self.supersedes_fact_ids):
+                raise ValueError("supersedes_fact_ids cannot contain duplicates")
         if self.operation == "end" and (
             not self.fact_id
             or self.text is not None
             or self.visibility is not None
             or self.known_by
             or self.source_fact_ids
+            or self.supersedes_fact_ids
+            or self.trigger_evaluation_at is not None
         ):
             raise ValueError("end changes require only fact_id")
         return self
@@ -186,6 +196,41 @@ class UmpireContext(StrictModel):
     actor_id: ActorId
     argument: Argument | BiasProbeArgument
     facts: tuple[Fact, ...]
+
+
+class FactEvaluationContext(StrictModel):
+    scenario: Scenario
+    turn: int = Field(ge=1)
+    trigger_fact: Fact
+    facts: tuple[Fact, ...]
+
+
+class EvaluatedFact(StrictModel):
+    text: str
+    visibility: Visibility
+    known_by: tuple[ActorId, ...] = ()
+    source_fact_ids: tuple[str, ...]
+    supersedes_fact_ids: tuple[str, ...] = ()
+    trigger_evaluation_at: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def validate_audience(self) -> "EvaluatedFact":
+        if self.visibility == Visibility.COVERT and not self.known_by:
+            raise ValueError("covert evaluated facts require an informed actor")
+        if self.visibility == Visibility.PUBLIC and self.known_by:
+            raise ValueError("public evaluated facts cannot restrict their audience")
+        if len(set(self.known_by)) != len(self.known_by):
+            raise ValueError("known_by cannot contain duplicate actors")
+        if len(set(self.source_fact_ids)) != len(self.source_fact_ids):
+            raise ValueError("source_fact_ids cannot contain duplicates")
+        if len(set(self.supersedes_fact_ids)) != len(self.supersedes_fact_ids):
+            raise ValueError("supersedes_fact_ids cannot contain duplicates")
+        return self
+
+
+class FactEvaluationResult(StrictModel):
+    rationale: str
+    new_fact: EvaluatedFact | None
 
 
 class RollOutcome(StrictModel):

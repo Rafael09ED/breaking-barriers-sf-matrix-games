@@ -6,6 +6,7 @@ from takeoff.events import (
     ArgumentProposed,
     ArgumentVetoed,
     FactsCommitted,
+    FactEvaluationRecorded,
     GameAborted,
     GameEvent,
     GameStarted,
@@ -88,6 +89,12 @@ def render_event(event: GameEvent) -> str:
             _fact_line("-", fact_id, "ended") for fact_id in event.public_ended
         )
         return "\n".join(lines)
+
+    if isinstance(event, FactEvaluationRecorded):
+        fact = event.added_fact
+        if fact is None or fact.visibility != Visibility.PUBLIC:
+            return ""
+        return _fact_line("+", fact.id, fact.text)
 
     return render_argument(event)
 

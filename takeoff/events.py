@@ -87,6 +87,15 @@ class FactsCommitted(EventBase):
     public_ended: tuple[str, ...]
 
 
+class FactEvaluationRecorded(EventBase):
+    type: Literal["fact_evaluation_recorded"] = "fact_evaluation_recorded"
+    turn: int = Field(ge=1)
+    trigger_fact_id: str
+    rationale: str
+    added_fact: Fact | None
+    attempts: int = Field(ge=1, le=2)
+
+
 class GameAborted(EventBase):
     type: Literal["game_aborted"] = "game_aborted"
     reason: str
@@ -100,6 +109,7 @@ GameEvent = Annotated[
     | AdjudicationRecorded
     | RollResolved
     | FactsCommitted
+    | FactEvaluationRecorded
     | GameAborted,
     Field(discriminator="type"),
 ]
@@ -117,6 +127,7 @@ class GameState(StrictModel):
     adjudications: tuple[AdjudicationRecorded, ...] = ()
     rolls: tuple[RollResolved, ...] = ()
     fail_chits: dict[ActorId, int] = Field(default_factory=dict)
+    evaluated_triggers: tuple[tuple[str, int], ...] = ()
     abort_reason: str | None = None
 
 
@@ -164,7 +175,28 @@ def reduce_event(state: GameState, event: GameEvent) -> GameState:
         )
 
     if event.turn != state.current_turn:
-        raise ValueError("argument turn does not match the active turn")
+        raise ValueError("event turn does not match the active turn")
+    if isinstance(event, FactEvaluationRecorded):
+        trigger = state.facts.get(event.trigger_fact_id)
+        trigger_key = (event.trigger_fact_id, event.turn)
+        if trigger is None:
+            raise ValueError("cannot evaluate an unknown triggering fact")
+        if trigger.trigger_evaluation_at != event.turn:
+            raise ValueError("fact evaluation does not match its scheduled turn")
+        if trigger_key in state.evaluated_triggers:
+            raise ValueError("fact evaluation trigger was already consumed")
+        facts = dict(state.facts)
+        if event.added_fact is not None:
+            if event.added_fact.id in facts:
+                raise ValueError(f"fact id already exists: {event.added_fact.id}")
+            facts[event.added_fact.id] = event.added_fact
+        return state.model_copy(
+            update={
+                "last_seq": event.seq,
+                "facts": facts,
+                "evaluated_triggers": (*state.evaluated_triggers, trigger_key),
+            }
+        )
     if event.actor_id not in state.actor_order:
         raise ValueError("argument actor is not in the active turn order")
     if isinstance(event, ArgumentProposed):

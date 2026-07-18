@@ -13,6 +13,7 @@ def test_openrouter_request_disables_reasoning_and_configures_retries() -> None:
         return SimpleNamespace(
             choices=[
                 SimpleNamespace(
+                    finish_reason="stop",
                     message=SimpleNamespace(
                         content=(
                             '{"action":"Audit.","intended_result":"Evidence.",'
@@ -52,6 +53,9 @@ def test_openrouter_request_disables_reasoning_and_configures_retries() -> None:
 
     assert '"action":"Audit."' in content
     assert captured["model"] == "z-ai/glm-5.2"
+    assert captured["messages"] == [
+        {"role": "user", "content": "Make an argument."}
+    ]
     assert captured["extra_body"] == {
         "reasoning": {"enabled": False},
         "provider": {"require_parameters": True},

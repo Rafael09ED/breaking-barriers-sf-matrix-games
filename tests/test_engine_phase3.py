@@ -6,6 +6,8 @@ import pytest
 from takeoff.controllers import ProposalResult
 from takeoff.engine import run_live_game
 from takeoff.events import (
+    ArgumentProposed,
+    FactEvaluationRecorded,
     FactsCommitted,
     GameAborted,
     GameState,
@@ -22,12 +24,14 @@ from takeoff.models import (
     Audience,
     Fact,
     FactChange,
+    FactEvaluationResult,
+    EvaluatedFact,
     Visibility,
 )
 from takeoff.scenario import build_scenario
 from takeoff.openrouter import ModelOutputError
 from takeoff.transcript import JsonlEventStore
-from takeoff.umpire import AdjudicationResult
+from takeoff.umpire import AdjudicationResult, TriggerEvaluationResult
 
 
 class FixedController:
@@ -107,6 +111,25 @@ class FixedUmpire:
         return AdjudicationResult(self.result, attempts=1)
 
 
+class TriggerUmpire(FixedUmpire):
+    def __init__(self, result: FactEvaluationResult) -> None:
+        super().__init__(adjudication())
+        self.evaluation = result
+        self.trigger_calls = 0
+
+    def evaluate_trigger(self, context):
+        self.trigger_calls += 1
+        return TriggerEvaluationResult(self.evaluation, attempts=1)
+
+
+class FailingTriggerUmpire(FixedUmpire):
+    def __init__(self) -> None:
+        super().__init__(adjudication())
+
+    def evaluate_trigger(self, context):
+        raise ModelOutputError("fact evaluation invalid after 2 attempts for F5")
+
+
 class DoubleVetoUmpire:
     def adjudicate(self, context):
         return AdjudicationResult(
@@ -156,6 +179,18 @@ class InterruptedController:
         raise KeyboardInterrupt
 
 
+def scenario_with_due_trigger():
+    scenario = build_scenario(turns=1)
+    trigger = Fact(
+        id="F5",
+        text="The temporary Agent-5 suspension remained under review.",
+        trigger_evaluation_at=1,
+    )
+    return scenario.model_copy(
+        update={"start_facts": (*scenario.start_facts, trigger)}
+    )
+
+
 def test_every_actor_turn_commits_a_fact(tmp_path) -> None:
     store = JsonlEventStore(tmp_path / "game.jsonl")
 
@@ -172,6 +207,97 @@ def test_every_actor_turn_commits_a_fact(tmp_path) -> None:
     assert len(commits) == 5
     assert all(event.added or event.ended for event in commits)
     assert len(state.facts) == 9
+
+
+def test_due_trigger_appends_fact_before_first_actor_and_replays(tmp_path) -> None:
+    store = JsonlEventStore(tmp_path / "game.jsonl")
+    umpire = TriggerUmpire(
+        FactEvaluationResult(
+            rationale="The review ended while the later pause remained in force.",
+            new_fact=EvaluatedFact(
+                text="The review period ended while Agent-5 training remained paused.",
+                visibility=Visibility.PUBLIC,
+                source_fact_ids=("F5",),
+                supersedes_fact_ids=("F5",),
+            ),
+        )
+    )
+    output = StringIO()
+
+    state = run_live_game(
+        scenario_with_due_trigger(),
+        store,
+        FixedController(),
+        umpire,
+        roller=lambda rules: (4, 4),
+        write=output.write,
+    )
+
+    events = store.load()
+    evaluation_index = next(
+        index for index, event in enumerate(events)
+        if isinstance(event, FactEvaluationRecorded)
+    )
+    argument_index = next(
+        index for index, event in enumerate(events)
+        if isinstance(event, ArgumentProposed)
+    )
+    assert evaluation_index < argument_index
+    assert umpire.trigger_calls == 1
+    assert ("F5", 1) in state.evaluated_triggers
+    assert state.facts["F5"].active
+    assert any(
+        fact.supersedes_fact_ids == ("F5",) for fact in state.facts.values()
+    )
+    assert "review period ended" in output.getvalue()
+    assert rebuild_state(events) == state
+
+
+def test_due_trigger_records_no_change_once(tmp_path) -> None:
+    umpire = TriggerUmpire(
+        FactEvaluationResult(
+            rationale="The ledger establishes no materially new status.",
+            new_fact=None,
+        )
+    )
+    store = JsonlEventStore(tmp_path / "game.jsonl")
+
+    state = run_live_game(
+        scenario_with_due_trigger(),
+        store,
+        FixedController(),
+        umpire,
+        roller=lambda rules: (4, 4),
+        write=StringIO().write,
+    )
+
+    evaluations = [
+        event for event in store.load()
+        if isinstance(event, FactEvaluationRecorded)
+    ]
+    assert len(evaluations) == 1
+    assert evaluations[0].added_fact is None
+    assert umpire.trigger_calls == 1
+    assert ("F5", 1) in state.evaluated_triggers
+
+
+def test_failed_due_trigger_aborts_before_first_actor(tmp_path) -> None:
+    controller = FixedController()
+    store = JsonlEventStore(tmp_path / "game.jsonl")
+
+    with pytest.raises(ModelOutputError, match="fact evaluation invalid"):
+        run_live_game(
+            scenario_with_due_trigger(),
+            store,
+            controller,
+            FailingTriggerUmpire(),
+            write=StringIO().write,
+        )
+
+    events = store.load()
+    assert isinstance(events[-1], GameAborted)
+    assert controller.calls == 0
+    assert not any(isinstance(event, ArgumentProposed) for event in events)
 
 
 def test_failed_covert_action_keeps_all_consequences_private(tmp_path) -> None:

@@ -130,6 +130,23 @@ def test_player_prompt_requires_one_bounded_undertaking() -> None:
     assert "independent success criteria" in system_prompt
 
 
+def test_player_prompt_prohibits_revealing_private_motives() -> None:
+    client = FakeClient(
+        [
+            '{"action":"Audit.","intended_result":"Evidence.",'
+            '"reasons":["Ambiguous results."],'
+            '"spend_fail_chit_on_failure":false}'
+        ]
+    )
+
+    LlmController(client).propose(context_for(ActorId.AGENT4))
+
+    system_prompt = " ".join(client.messages[0][0]["content"].split())
+    assert "Never quote or reveal private doctrine" in system_prompt
+    assert "hidden objectives" in system_prompt
+    assert "covert fact IDs" in system_prompt
+
+
 def test_player_retry_prompt_includes_umpire_veto() -> None:
     client = FakeClient(
         [

@@ -109,6 +109,14 @@ def test_umpire_prompt_reserves_other_players_actions_for_their_turns() -> None:
     assert "do not decide actions for any of the other four" in user_prompt
 
 
+def test_umpire_prompt_keeps_failure_distinct_from_success() -> None:
+    system_prompt = " ".join(umpire_messages(context())[0]["content"].split())
+
+    assert "must not establish the intended result or the core success fact" in system_prompt
+    assert "resolve it explicitly as stage k of at most 3" in system_prompt
+    assert "never which branch is true" in system_prompt
+
+
 def test_umpire_recomputes_bad_arithmetic_without_retry() -> None:
     client = FakeClient([valid_adjudication(net_mod=2)])
 
@@ -190,6 +198,60 @@ def test_umpire_retries_unknown_discovery_source() -> None:
 def test_umpire_retries_public_fact_from_covert_adjudication() -> None:
     invalid = json.loads(valid_adjudication())
     invalid["visibility"] = "covert"
+    client = FakeClient([json.dumps(invalid), valid_adjudication()])
+
+    result = LlmUmpire(client).adjudicate(context())
+
+    assert result.attempts == 2
+    assert client.calls == 2
+
+
+def test_umpire_retries_fact_that_normalizes_to_active_duplicate() -> None:
+    invalid = json.loads(valid_adjudication())
+    invalid["new_facts_success"][0]["text"] = (
+        "  AGENT-4   PERFORMS AI RESEARCH BEYOND TOP HUMAN LEVEL!  "
+    )
+    client = FakeClient([json.dumps(invalid), valid_adjudication()])
+
+    result = LlmUmpire(client).adjudicate(context())
+
+    assert result.attempts == 2
+    assert client.calls == 2
+
+
+def test_umpire_retries_duplicate_facts_within_one_branch() -> None:
+    invalid = json.loads(valid_adjudication())
+    invalid["new_facts_success"].append(
+        {
+            "operation": "add",
+            "fact_id": None,
+            "text": "  THE AUDIT ISOLATED A REPRODUCIBLE ANOMALY! ",
+            "visibility": "public",
+            "known_by": [],
+        }
+    )
+    client = FakeClient([json.dumps(invalid), valid_adjudication()])
+
+    result = LlmUmpire(client).adjudicate(context())
+
+    assert result.attempts == 2
+    assert client.calls == 2
+
+
+def test_umpire_retries_fact_triggered_outside_game() -> None:
+    invalid = json.loads(valid_adjudication())
+    invalid["new_facts_success"][0]["trigger_evaluation_at"] = 7
+    client = FakeClient([json.dumps(invalid), valid_adjudication()])
+
+    result = LlmUmpire(client).adjudicate(context())
+
+    assert result.attempts == 2
+    assert client.calls == 2
+
+
+def test_umpire_retries_unknown_superseded_fact() -> None:
+    invalid = json.loads(valid_adjudication())
+    invalid["new_facts_success"][0]["supersedes_fact_ids"] = ["F999"]
     client = FakeClient([json.dumps(invalid), valid_adjudication()])
 
     result = LlmUmpire(client).adjudicate(context())

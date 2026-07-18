@@ -34,6 +34,14 @@ provider that supports the requested strict JSON Schema. A provider/network or
 schema failure records an abort event, preserves the partial transcript, and
 exits cleanly.
 
+Facts may schedule an umpire reevaluation with `trigger_evaluation_at`. At the
+start of that turn, before any actor moves, a dedicated structured call compares
+the triggering fact with the complete privileged ledger. It records either no
+change or one new append-only fact, which may schedule one later reevaluation.
+The original fact remains in history. Every evaluation result is stored in the
+JSONL transcript for zero-network replay; two invalid responses abort cleanly
+rather than silently skipping the review.
+
 The umpire scores the supporting and opposing cases holistically on the same
 0-3 scale. Individual claims remain visible for auditability and failure
 narration, but their count does not add points. Duplicate, overlapping, generic,
