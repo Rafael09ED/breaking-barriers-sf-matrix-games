@@ -16,8 +16,9 @@ the consequences of acting under uncertainty.
 **[Launch TAKEOFF](https://takeoff-breaking-barriers-sf.fly.dev/)**
 
 The hosted demo is designed for mobile and requires no account. It is ephemeral:
-active games disappear when the server restarts, and an expired game link cannot
-be recovered.
+games expire after 10 minutes without a human submission or game progress, active
+games disappear when the server restarts, and an expired game link cannot be
+recovered.
 
 ## How to play
 

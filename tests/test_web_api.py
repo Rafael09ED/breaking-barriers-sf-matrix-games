@@ -22,7 +22,7 @@ class EchoParser:
         )
 
 
-def session_factory(completed: Event):
+def session_factory(completed: Event, clock=None):
     def factory(token, human_actor):
         human = WebHumanController(EchoParser())
 
@@ -48,7 +48,9 @@ def session_factory(completed: Event):
             completed.set()
             return state
 
-        return GameSession(token, human_actor, human, run)
+        if clock is None:
+            return GameSession(token, human_actor, human, run)
+        return GameSession(token, human_actor, human, run, clock=clock)
 
     return factory
 
@@ -133,3 +135,26 @@ def test_pages_and_api_set_privacy_headers() -> None:
     for response in (index, health, roles):
         assert response.headers["referrer-policy"] == "no-referrer"
         assert response.headers["x-content-type-options"] == "nosniff"
+
+
+def test_inactive_game_expires_and_returns_not_found() -> None:
+    now = [1_000.0]
+    clock = lambda: now[0]
+    registry = SessionRegistry(
+        session_factory(Event(), clock),
+        inactivity_timeout=600,
+        cleanup_interval=3_600,
+        clock=clock,
+    )
+    client = TestClient(create_app(registry))
+    token = client.post("/api/games", json={"actor_id": "ALIGN"}).json()["token"]
+    wait_for_waiting(client, token)
+
+    now[0] += 599
+    assert registry.expire_inactive() == 0
+    assert client.get(f"/api/games/{token}").status_code == 200
+
+    now[0] += 1
+    assert registry.expire_inactive() == 1
+    assert registry.get(token) is None
+    assert client.get(f"/api/games/{token}").status_code == 404

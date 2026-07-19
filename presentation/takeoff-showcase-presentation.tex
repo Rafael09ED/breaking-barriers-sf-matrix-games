@@ -2,9 +2,13 @@
 \usetheme{metropolis}
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
+\usepackage{graphicx}
+\usepackage{xurl}
+\usepackage{qrcode}
 \usepackage{tikz}
 \usepackage{fontawesome5}
 \usetikzlibrary{arrows.meta,positioning}
+\urlstyle{tt}
 
 % TAKEOFF's visual language: terminal black, warm paper, signal amber, state cyan.
 \definecolor{TerminalBlack}{HTML}{101416}
@@ -43,6 +47,14 @@
   \end{tikzpicture}
 }
 
+\newcommand{\qrimage}{%
+  \IfFileExists{qrcode_takeoff-breaking-barriers-sf.fly.dev.png}{%
+    \includegraphics[width=0.82\linewidth]{qrcode_takeoff-breaking-barriers-sf.fly.dev.png}%
+  }{%
+    \qrcode[height=0.82\linewidth]{https://takeoff-breaking-barriers-sf.fly.dev/}%
+  }%
+}
+
 \title{TAKEOFF}
 \subtitle{An AI 2027 Matrix Game}
 \author{Rafael}
@@ -66,12 +78,12 @@
   }
 
   \vspace{0.7em}
+  {\Large\bfseries Learn AI takeoff by playing it.}
 \end{frame}
 \note{
-  Start on the terminal replay if it is ready; this frame is the zero-network backup.
-  Say: ``Agent-4 wants more access. The umpire must expose the case against it.
-  The model judges plausibility, but code rolls the dice. The result becomes a fact
-  every future argument must live with.'' Then: ``Argue. Adjudicate. Commit.''
+  Start on replay if available. Keep this direct: you are seeing one turn where an
+  AI actor makes an argument, the umpire scores it, code rolls dice, and a new fact
+  is committed. This is the core mechanic used to explore AI 2027 decisions.
 }
 
 % -----------------------------------------------------------------------------
@@ -80,31 +92,30 @@
     \begin{column}{0.58\textwidth}
       {\fontsize{28}{32}\selectfont\bfseries
         The AI 2027 team asked for\\
-        an online version.}
+        an online AGI wargame.}
 
       \vspace{0.8em}
       \large
-      A 4-hour in-person exercise\\
-      for 8--14 players still needs\\
-      a skilled facilitator.
+      This is the first iteration:\\
+      a playable matrix game\\
+      for AI 2027 exploration.
     \end{column}
     \begin{column}{0.38\textwidth}
       \terminalbox{%
         {\color{State}\mono{PUBLIC REQUEST}}\\[0.35em]
         \mono{``help us make an online}\\
         \mono{AGI wargame''}\\[0.35em]
-        {\color{Signal}\mono{LLM-driven characters}}
+        {\color{Signal}\mono{LLM-driven}}\\
+        {\color{Signal}\mono{characters}}
       }
     \end{column}
   \end{columns}
 
-  \source{AI Futures Project, About; Vollmer, LessWrong (June 2025)}
+  \source{AI Futures Project, About;\\ Vollmer, LessWrong (June 2025)}
 \end{frame}
 \note{
-  This slide should feel like a response to an explicit request, not a generic pitch.
-  Keep the line simple: the AI 2027 team asked for an online AGI wargame, and
-  TAKEOFF is a prototype response. The left side gives the scale of the in-person
-  exercise; the right side makes the request concrete.
+  Keep this as a factual response slide, not hype. They asked for this. We built a
+  first iteration focused on accessibility and repeated simulation.
 }
 
 % -----------------------------------------------------------------------------
@@ -122,25 +133,25 @@
     \node[active,right=0.25cm of china] (agent) {AGENT-4\\\color{Signal}[?]};
   \end{tikzpicture}
 
-  \vspace{1.1em}
-  {\Large A CLI matrix game for rehearsing decisions,\par
-  not forecasting the future.}
+  \vspace{0.9em}
+  {\large If you can type and make arguments, you can play.}
 
-  \vspace{0.8em}
-  {\color{Muted}\mono{BUILT: LLM autoplay + auditable JSONL ledger}}\\
-  {\color{Signal}\mono{NEXT: human seats + offline replay}}
+  \vspace{0.35em}
+  {\large Built for people who just read AI 2027 or took an alignment course.}
+
+  \vspace{0.6em}
+  {\color{Muted}\mono{LLMs and humans can play}}\\
+  {\color{Signal}\mono{Your choices change the shared world state}}
 
   \source{Scenario inspired by AI 2027; project is unofficial and unaffiliated.}
 \end{frame}
 \note{
-  The five actors have conflicting private objectives. Agent-4 may be secretly
-  misaligned. Today the prototype autoplays all five seats and records every event.
-  Human seats and offline replay are the immediate demo-hardening roadmap, not
-  completed features.
+  Keep audience fit explicit: this is for people moving from reading into active
+  reasoning. They can test how incentives and actions push outcomes in different directions.
 }
 
 % -----------------------------------------------------------------------------
-\begin{frame}{One rule keeps the models honest}
+\begin{frame}{How it works}
   \centering
   \begin{tikzpicture}[
     flowstep/.style={draw=Muted!50,fill=TerminalPanel,minimum width=2.3cm,
@@ -159,94 +170,83 @@
   \end{tikzpicture}
 
   \vspace{1.2em}
-  {\Large The model judges plausibility.\\
-  \textcolor{Signal}{Code rolls the dice.}}
+  {\Large LLMs generate arguments and counterarguments.\\
+  \textcolor{Signal}{Code rolls dice and commits the result.}}
 
   \source{Engle (1992); Curry \& Price, Matrix Games for Modern Wargaming (2014)}
 \end{frame}
 \note{
-  Matrix games are a 1992 professional wargaming format: an actor argues that
-  something happens and gives reasons; opposition is weighed; dice resolve the
-  uncertain result. Here the LLM proposes and scores structured arguments. Code
-  validates the modifier, rolls 2d6, and commits consequences to an append-only ledger.
+  Keep the loop chart. Explain quickly: actor proposes, umpire adjudicates, dice resolve,
+  and outcome becomes a fact. This is Chris Engle's matrix format adapted to AI 2027.
 }
 
 % -----------------------------------------------------------------------------
-\begin{frame}{A rehearsal instrument, not an oracle}
-  \begin{columns}[T,onlytextwidth]
-    \begin{column}{0.48\textwidth}
-      {\color{Pass}\large\bfseries USE IT TO}
-      \vspace{0.35em}
-      \begin{itemize}
-        \item surface assumptions
-        \item rehearse oversight
-        \item stress-test decisions
-      \end{itemize}
-    \end{column}
-    \begin{column}{0.48\textwidth}
-      {\color{Fail}\large\bfseries DO NOT USE IT TO}
-      \vspace{0.35em}
-      \begin{itemize}
-        \item predict AGI
-        \item prove a strategy works
-        \item simulate superintelligence
-      \end{itemize}
-    \end{column}
-  \end{columns}
+\begin{frame}{Why this helps}
+  \begin{itemize}
+    \item You test understanding by making decisions inside the scenario.
+    \item You see how incentives move the world in different directions.
+    \item You practice argument quality, not just opinions.
+    \item As far as I know, no one else has built this exact combo:
+      Engle matrix format + AI alignment scenario + LLM and human play.
+  \end{itemize}
 
-  \vspace{0.8em}
-  \centering
-  {\large Agent-4 is a \textcolor{Signal}{lower bound}, not a ceiling.}
+  \vspace{0.4em}
+  {\color{Muted}\small This is for exploration and training, not forecasting.}
 
-  \source{Curry \& Price (2014); Rivera et al. (2024); Lamparth et al. (2024)}
+  \source{Curry \& Price (2014); Griffin \& Riggs (2024); Hogan \& Brennen (2024)}
 \end{frame}
 \note{
-  Deliver this without apology. LLM wargame players show escalation and prompt
-  sensitivity. Umpire sycophancy is also a core open problem, so TAKEOFF forces
-  visible counterarguments and keeps an auditable transcript. An LLM roleplaying
-  misalignment is a method actor, not the character: beating it is not victory;
-  losing to it is still useful evidence about a protocol.
+  Keep novelty phrasing cautious: ``as far as I know.'' This avoids overclaiming while
+  still making the differentiation clear.
 }
 
 % -----------------------------------------------------------------------------
-\begin{frame}{The instrument grows with the threat}
+\begin{frame}{Status and trajectory}
   \centering
   \terminalbox{%
-    {\color{Pass}\mono{[x]}} \mono{structured arguments and forced cons}\\
-    {\color{Pass}\mono{[x]}} \mono{code-owned dice, rules, and append-only ledger}\\
-    {\color{Pass}\mono{[x]}} \mono{umpire test battery with visible scoring}\\
-    {\color{Signal}\mono{[ ]}} \mono{measure umpire bias and sycophancy}\\
-    {\color{Signal}\mono{[ ]}} \mono{compare oversight doctrines across branches}\\
-    {\color{Signal}\mono{[ ]}} \mono{rerun the adversary seat on stronger models}
+    {\color{Pass}\mono{[x]}} \mono{engine built and playable today}\\
+    {\color{Pass}\mono{[x]}} \mono{public demo and public code repository}\\
+    {\color{Pass}\mono{[x]}} \mono{LLM and human gameplay paths}\\
+    {\color{Signal}\mono{[ ]}} \mono{add alternative scenarios}\\
+    {\color{Signal}\mono{[ ]}} \mono{expand evaluation and training use cases}\\
+    {\color{Signal}\mono{[ ]}} \mono{improve narrative quality as LLMs improve}
   }
 
   \vspace{0.7em}
-  {\Large Swap in next year's model. Watch the curve.}
+  {\Large The simulator gets stronger as LLMs advance.}
 
-  \source{Related frame: Greenblatt, Shlegeris et al., AI Control (2023)}
+  \source{Project status statement for external submission context}
 \end{frame}
 \note{
-  The practical next step is the umpire eval harness, then human seats and replay.
-  Doctrine comparison is future work: branch from the same ledger state, change the
-  oversight protocol, and inspect how the surfaced tactics differ. The theory of
-  change is pre-screening and rehearsal before scarce expert tabletop exercises,
-  not replacing those exercises.
+  This is the plainspoken progress slide: what exists now, what expands next, and
+  why model progress improves this tool over time.
 }
 
 % -----------------------------------------------------------------------------
 \begin{frame}[plain]
-  \centering
-  \vspace{1.0em}
-  {\fontsize{27}{32}\selectfont\bfseries
-    If you can type\\[0.2em]
-    \textcolor{Signal}{``x happens, for y reasons''}\\[0.2em]
-    you can play.}
+  \begin{columns}[c,onlytextwidth]
+    \begin{column}{0.58\textwidth}
+      {\fontsize{24}{28}\selectfont\bfseries
+        Play now.\\[0.2em]
+        Simulate choices.\\[0.2em]
+        Compare outcomes.}
+
+      \vspace{0.8em}
+      {\small\color{State}\mono{Demo}}\\
+      {\footnotesize\url{https://takeoff-breaking-barriers-sf.fly.dev/}}\\[0.45em]
+      {\small\color{State}\mono{Code}}\\
+      {\footnotesize\url{https://github.com/Rafael09ED/breaking-barriers-sf-matrix-games}}
+    \end{column}
+    \begin{column}{0.38\textwidth}
+      \centering
+      \qrimage
+    \end{column}
+  \end{columns}
 
 \end{frame}
 \note{
-  This hackathon lowers the barrier into AI safety. Engle's rule lowers the barrier
-  into scenario thinking. Close on the sentence on screen and stop. The command is
-  the product direction; do not imply that human seating is already implemented.
+  Close with concrete CTA: scan the QR for the demo, use the repo for simulations,
+  and invite people to test scenarios right away.
 }
 
 \end{document}

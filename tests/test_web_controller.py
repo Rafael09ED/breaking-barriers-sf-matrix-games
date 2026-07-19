@@ -3,7 +3,7 @@ from threading import Thread
 from takeoff.controllers import ProposalResult
 from takeoff.models import ActorId, Argument
 from takeoff.openrouter import ModelOutputError
-from takeoff.web_sessions import WebHumanController
+from takeoff.web_sessions import GameExpiredError, WebHumanController
 
 from tests.test_controllers import context_for
 
@@ -30,6 +30,13 @@ class RecordingParser:
 
 def run_proposal(controller, context, results):
     results.append(controller.propose(context))
+
+
+def run_until_expired(controller, context, expired):
+    try:
+        controller.propose(context)
+    except GameExpiredError:
+        expired.append(True)
 
 
 def test_web_human_controller_waits_for_submission() -> None:
@@ -123,6 +130,25 @@ def test_duplicate_submission_id_is_idempotent() -> None:
     assert not controller.submit("same-id", "Run a different action.")
     thread.join(timeout=1)
     assert results[0].argument.action == "Run an audit."
+
+
+def test_expiry_releases_controller_waiting_for_human() -> None:
+    controller = WebHumanController(RecordingParser())
+    expired: list[bool] = []
+    thread = Thread(
+        target=run_until_expired,
+        args=(controller, context_for(ActorId.ALIGN), expired),
+        daemon=True,
+    )
+    thread.start()
+    wait_for_status(controller, "waiting_human")
+
+    controller.expire()
+    thread.join(timeout=1)
+
+    assert not thread.is_alive()
+    assert expired == [True]
+    assert controller.snapshot().status == "expired"
 
 
 def wait_for_status(controller, status, require_error=False):
