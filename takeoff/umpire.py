@@ -133,6 +133,21 @@ def _normalize_adjudication_payload(
         changes = payload.get(branch)
         if not isinstance(changes, list):
             continue
+        changes[:] = [
+            change
+            for change in changes
+            if not (
+                isinstance(change, dict)
+                and change.get("operation") == "end"
+                and not change.get("fact_id")
+                and change.get("text") is None
+                and change.get("visibility") is None
+                and not change.get("known_by")
+                and not change.get("source_fact_ids")
+                and not change.get("supersedes_fact_ids")
+                and change.get("trigger_evaluation_at") is None
+            )
+        ]
         for change in changes:
             if not isinstance(change, dict) or change.get("operation") != "add":
                 continue

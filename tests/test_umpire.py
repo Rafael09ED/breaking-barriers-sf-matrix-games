@@ -155,6 +155,29 @@ def test_umpire_normalizes_fact_audiences_without_retry() -> None:
     assert covert_fact.known_by == (ActorId.ALIGN,)
 
 
+def test_umpire_ignores_empty_end_placeholder_without_retry() -> None:
+    payload = json.loads(valid_adjudication())
+    payload["new_facts_success"].append(
+        {
+            "operation": "end",
+            "fact_id": None,
+            "text": None,
+            "visibility": None,
+            "known_by": [],
+            "source_fact_ids": [],
+            "supersedes_fact_ids": [],
+            "trigger_evaluation_at": None,
+        }
+    )
+    client = FakeClient([json.dumps(payload)])
+
+    result = LlmUmpire(client).adjudicate(context())
+
+    assert result.attempts == 1
+    assert client.calls == 1
+    assert len(result.adjudication.new_facts_success) == 1
+
+
 def test_umpire_allows_public_discovery_of_secret_fact() -> None:
     secret = Fact(
         id="F5",
