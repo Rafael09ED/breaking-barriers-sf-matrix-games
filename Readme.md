@@ -1,13 +1,57 @@
 # TAKEOFF
 
-TAKEOFF is an LLM-driven CLI matrix game about the AI 2027 scenario. The current
-Phase 3 build runs complete OpenRouter-driven turns: five persona-conditioned
-players propose actions, an LLM umpire assesses pros and cons, code rolls 2d6,
-and each success or failure commits consequences to an append-only JSONL ledger.
-Veto retries, fail chits, covert facts, modifier clamps, and malformed-response
-validation are enforced outside the models. If both response attempts fail,
-the exact errors are logged, `GameAborted` is appended, and play stops without
-synthesizing an argument, adjudication, roll, or fact.
+TAKEOFF is an LLM-driven matrix game about the [AI 2027](https://ai-2027.com/)
+scenario. One human plays a major actor while four persona-conditioned LLM
+players pursue competing objectives. An LLM umpire assesses each argument, code
+rolls the dice, and every success or failure changes the shared situation.
+
+**Primary audience:** **a BlueDot-course graduate who wants to test whether they
+actually understood AI 2027's dynamics.** TAKEOFF turns the scenario from
+something you read into something you must reason inside: capability races,
+alignment evidence, government oversight, espionage, strategic pressure, and
+the consequences of acting under uncertainty.
+
+## Play online
+
+**[Launch TAKEOFF](https://takeoff-breaking-barriers-sf.fly.dev/)**
+
+The hosted demo is designed for mobile and requires no account. It is ephemeral:
+active games disappear when the server restarts, and an expired game link cannot
+be recovered.
+
+## How to play
+
+1. Open the live demo and choose one of five roles: OpenBrain's CEO, its alignment
+	lead, the US President and NSC, China's DeepCent leadership, or Agent-4. The
+	other four roles are controlled by LLMs.
+2. Read **Established facts** and expand **Your role** to see your private brief
+	and objectives. Make decisions from what your actor knows, not from the full
+	AI 2027 narrative.
+3. On your turn, use the single text box to state **one action**, the **result you
+	want**, and **one to three reasons** it should work. For example: "I run a
+	focused audit to produce evidence of deceptive reasoning because the latest
+	interpretability results are ambiguous and my team has access to Agent-4's
+	internal traces."
+4. Submit the argument. A parser preserves your intent and converts it into the
+	game schema. The umpire weighs the supporting case against concrete risks;
+	code then rolls 2d6 with the resulting modifier. A total of 7 or more usually
+	succeeds, while a natural 2 always fails.
+5. Read the outcome and newly established facts at the top of the transcript.
+	These facts constrain every later move, so adapt your strategy rather than
+	repeating an argument the world has made obsolete.
+6. If you hold a fail chit and want it used for a reroll, explicitly say so in
+	your next submission. The umpire may classify plausibly concealed actions as
+	covert; only information known to your role appears in your view.
+
+Your action can be vetoed if it attempts several major things at once, directly
+contradicts an established fact, or falls outside the scenario. When that
+happens, revise the preserved draft using the umpire's feedback and submit again.
+
+The current Phase 3 build runs complete OpenRouter-driven turns. Veto retries,
+fail chits, covert facts, modifier clamps, and malformed-response validation are
+enforced outside the models. If both response attempts fail, the exact errors
+are logged, `GameAborted` is appended, and play stops without synthesizing an
+argument, adjudication, roll, or fact.
 
 ## Setup
 
@@ -83,6 +127,48 @@ Set `TAKEOFF_DEBUG_PROMPTS=1` temporarily to append credential-free request
 payloads to `takeoff-prompts.jsonl` for secrecy audits. This file can contain
 actor private briefs and covert facts, is ignored by Git, and should not be
 shared.
+
+## Web demo
+
+The lightweight web version lets one visitor play any role while the remaining
+four roles use the configured LLM player. It uses the same umpire, dice, ledger,
+and visibility rules as the CLI. Start it locally with:
+
+```bash
+uv run takeoff-web
+```
+
+Open `http://localhost:8080`, choose a role, and enter the action, desired result,
+and reasons in the single turn box. To spend a held fail chit, say so in that
+submission. A low-temperature model extracts the text into the normal proposal
+schema; an invalid extraction is retried once and then returns the original draft
+for revision without changing game state. An umpire veto does the same with the
+veto reason attached.
+
+The browser polls a purpose-built projection rather than raw transcript events.
+It receives public outcomes, facts visible to the selected actor, and that actor's
+own covert outcomes. Other actors' covert material and unrealized outcome branches
+remain server-side.
+
+This deployment is intentionally ephemeral for a short demonstration. Games live
+in one Python process, secret game URLs are bearer access to a role's private
+information, and a restart loses every active game. Run exactly one Uvicorn worker
+and one Fly Machine. There is no database, Fly Volume, account system, admission
+limit, rate limit, or durable transcript.
+
+Deploy to Fly.io:
+
+```bash
+fly launch --no-deploy
+fly secrets set OPENROUTER_API_KEY=...
+fly deploy
+fly scale count 1
+fly open
+```
+
+After the event, `fly apps destroy <app-name>` removes the demo. Model and
+reasoning environment variables may be set through `fly secrets set` or the
+`[env]` section of `fly.toml`; they are never accepted from browsers.
 
 ## Sources
 

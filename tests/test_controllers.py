@@ -4,10 +4,15 @@ import logging
 import pytest
 from pydantic import BaseModel
 
-from takeoff.controllers import LlmController
+from takeoff.controllers import (
+    HumanTurnParser,
+    LlmController,
+    ProposalResult,
+    RoutingController,
+)
 from takeoff.events import GameStarted, GameState, TurnStarted, reduce_event
 from takeoff.ledger import build_player_context
-from takeoff.models import ActorId, Fact, Visibility
+from takeoff.models import ActorId, Argument, Fact, Visibility
 from takeoff.openrouter import ModelOutputError, StructuredModelClient
 from takeoff.scenario import build_scenario
 
@@ -192,3 +197,77 @@ def test_covert_fact_does_not_enter_other_actor_model_request() -> None:
 
     assert covert.text in owner_prompt
     assert covert.text not in other_prompt
+
+
+def test_human_turn_parser_extracts_submission_and_explicit_chit_choice() -> None:
+    client = FakeClient(
+        [
+            '{"action":"Run a bounded audit.",'
+            '"intended_result":"Produce evidence.",'
+            '"reasons":["F4 remains ambiguous."],'
+            '"spend_fail_chit_on_failure":true}'
+        ]
+    )
+    context = context_for(ActorId.ALIGN).model_copy(update={"fail_chits": 1})
+
+    result = HumanTurnParser(client).parse(
+        context,
+        "Run a bounded audit to produce evidence because F4 remains ambiguous. "
+        "Spend my fail chit if needed.",
+    )
+
+    assert result.argument.action == "Run a bounded audit."
+    assert result.spend_fail_chit_on_failure
+    prompt = " ".join(client.messages[0][0]["content"].split())
+    assert "Do not improve the strategy, add reasons" in prompt
+    assert "only when the player explicitly says" in prompt
+
+
+def test_human_turn_parser_retries_without_inventing_content() -> None:
+    client = FakeClient(
+        [
+            "not json",
+            '{"action":"Brief the NSC.",'
+            '"intended_result":"Establish oversight.",'
+            '"reasons":["The White House lacks a full briefing."],'
+            '"spend_fail_chit_on_failure":false}',
+        ]
+    )
+
+    result = HumanTurnParser(client).parse(
+        context_for(ActorId.POTUS), "Brief the NSC so oversight is established."
+    )
+
+    assert result.attempts == 2
+    assert "without adding content" in client.messages[1][-1]["content"]
+
+
+class RecordingController:
+    def __init__(self, action: str) -> None:
+        self.action = action
+        self.actors: list[ActorId] = []
+
+    def propose(self, context):
+        self.actors.append(context.actor.id)
+        return ProposalResult(
+            argument=Argument(
+                action=self.action,
+                intended_result="Change one thing.",
+                reasons=("One reason.",),
+            ),
+            attempts=1,
+        )
+
+
+def test_routing_controller_delegates_only_selected_actor_to_human() -> None:
+    human = RecordingController("Human action.")
+    llm = RecordingController("LLM action.")
+    controller = RoutingController(ActorId.ALIGN, human, llm)
+
+    human_result = controller.propose(context_for(ActorId.ALIGN))
+    llm_result = controller.propose(context_for(ActorId.CEO))
+
+    assert human_result.argument.action == "Human action."
+    assert llm_result.argument.action == "LLM action."
+    assert human.actors == [ActorId.ALIGN]
+    assert llm.actors == [ActorId.CEO]

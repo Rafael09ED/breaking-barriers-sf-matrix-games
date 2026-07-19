@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <title>TAKEOFF // GAME</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body data-page="game">
+  <header class="game-header">
+    <a href="/" class="wordmark">TAKEOFF</a>
+    <div><span id="role">...</span><span id="turn">TURN ...</span></div>
+  </header>
+  <main class="game-shell">
+    <section id="session-error" class="session-error" role="alert" hidden>
+      <h1>Game not found or expired</h1>
+      <p>This game is no longer available. You will have to start a new game.</p>
+      <a href="/">Start a new game</a>
+    </section>
+
+    <section id="composer" class="composer" aria-labelledby="composer-label" hidden>
+      <div class="status-line"><span id="composer-label">YOUR TURN</span><span id="chits"></span></div>
+      <p id="feedback" class="feedback" hidden></p>
+      <label for="proposal">Describe your action, desired result, and reasons.</label>
+      <textarea id="proposal" rows="7" placeholder="I run a focused audit to produce evidence because the latest interpretability results remain ambiguous. Spend my fail chit if needed."></textarea>
+      <div class="composer-actions">
+        <span id="input-note">The umpire decides whether the action is covert.</span>
+        <button id="submit" type="button">Submit action</button>
+      </div>
+    </section>
+
+    <div id="activity" class="activity" role="status">Starting game...</div>
+
+    <div class="game-layout">
+      <section class="transcript" aria-labelledby="transcript-title">
+        <div class="section-heading"><h1 id="transcript-title">Game transcript</h1><span id="outcome-count">0 outcomes</span></div>
+        <div id="outcomes" class="outcomes" aria-live="polite"></div>
+      </section>
+
+      <aside class="side-rail">
+        <details open>
+          <summary>Established facts <span id="fact-count">0</span></summary>
+          <ol id="facts" class="facts"></ol>
+        </details>
+        <details>
+          <summary>Your role</summary>
+          <p id="private-brief"></p>
+          <ul id="objectives" class="objectives"></ul>
+        </details>
+      </aside>
+    </div>
+  </main>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

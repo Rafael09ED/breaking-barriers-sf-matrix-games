@@ -5,16 +5,20 @@ description = "An LLM-driven CLI matrix game about the AI 2027 scenario"
 readme = "Readme.md"
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi>=0.139.2",
     "openai>=1.68.0",
     "pydantic>=2.10.0",
     "python-dotenv>=1.1.0",
+    "uvicorn[standard]>=0.51.0",
 ]
 
 [project.scripts]
 takeoff = "takeoff.cli:main"
+takeoff-web = "takeoff.web:main"
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "pytest>=8.3.0",
 ]
 

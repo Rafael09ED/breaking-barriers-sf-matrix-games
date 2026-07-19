@@ -1,0 +1,10 @@
+.env
+.git
+.venv
+.pytest_cache
+__pycache__
+*.pyc
+game-*.jsonl
+takeoff-prompts.jsonl
+presentation
+tests

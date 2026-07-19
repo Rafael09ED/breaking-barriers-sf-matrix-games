@@ -179,6 +179,24 @@ def test_live_render_matches_transcript_render(tmp_path) -> None:
     assert replay_state.actor_order[0] == ActorId.ALIGN
 
 
+def test_engine_observer_receives_reduced_state_after_each_commit(tmp_path) -> None:
+    observed = []
+
+    final_state = run_live_game(
+        build_scenario(turns=1),
+        JsonlEventStore(tmp_path / "game.jsonl"),
+        EchoController(),
+        EchoUmpire(),
+        roller=lambda rules: (3, 3),
+        write=StringIO().write,
+        on_commit=lambda event, state: observed.append((event, state)),
+    )
+
+    assert observed
+    assert all(event.seq == state.last_seq for event, state in observed)
+    assert observed[-1][1] == final_state
+
+
 def test_covert_fact_is_visible_only_to_informed_actors_and_umpire() -> None:
     public = Fact(id="F1", text="Public fact")
     covert = Fact(

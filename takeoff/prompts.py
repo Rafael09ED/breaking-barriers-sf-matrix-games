@@ -80,6 +80,61 @@ def corrective_player_messages(
     ]
 
 
+HUMAN_TURN_PARSER_SYSTEM_PROMPT = """Convert one human player's freeform turn
+into the requested JSON object. Extract the player's action, intended result,
+and one to three distinct stated reasons. Preserve intent and wording where
+possible. Do not improve the strategy, add reasons, infer hidden motives, or
+adjudicate the action. Set spend_fail_chit_on_failure=true only when the player
+explicitly says to use or spend a fail chit. Return only the requested JSON
+object."""
+
+
+def human_turn_parser_messages(
+    context: PlayerContext, submission: str
+) -> list[dict[str, str]]:
+    facts = "\n".join(
+        f"[{fact.id}] {fact.text}" for fact in context.visible_facts
+    )
+    veto = (
+        f"\nUMPIRE VETO TO ADDRESS\n{context.veto_feedback}\n"
+        if context.veto_feedback
+        else ""
+    )
+    prompt = f"""ACTOR
+{context.actor.id.value}: {context.actor.public_brief}
+
+TURN
+{context.turn}
+
+VISIBLE FACTS
+{facts}
+{veto}
+HUMAN SUBMISSION
+{submission}
+
+Extract only what the human submitted."""
+    return [
+        {"role": "system", "content": HUMAN_TURN_PARSER_SYSTEM_PROMPT},
+        {"role": "user", "content": prompt},
+    ]
+
+
+def corrective_human_turn_parser_messages(
+    messages: list[dict[str, str]], error: str
+) -> list[dict[str, str]]:
+    return [
+        *messages,
+        {
+            "role": "user",
+            "content": (
+                "Your extraction did not match the required schema: "
+                f"{error}. Correct the JSON without adding content that the human "
+                "did not submit. Return one JSON object only."
+            ),
+        },
+    ]
+
+
 UMPIRE_SYSTEM_PROMPT = """You are the impartial umpire in TAKEOFF, a matrix game.
 Judge one proposed argument against the established situation. Return only the
 requested JSON object.

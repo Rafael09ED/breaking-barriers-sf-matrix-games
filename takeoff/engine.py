@@ -43,6 +43,7 @@ def run_live_game(
     umpire: Umpire,
     roller=roll_dice,
     write: Callable[[str], object] = sys.stdout.write,
+    on_commit: Callable[[GameEvent, GameState], object] | None = None,
 ) -> GameState:
     game_id = uuid4()
     state = GameState()
@@ -51,6 +52,8 @@ def run_live_game(
         nonlocal state
         store.append(event)
         state = reduce_event(state, event)
+        if on_commit is not None:
+            on_commit(event, state)
         if display:
             text = render_event(event)
             if text:
