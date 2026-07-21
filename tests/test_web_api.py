@@ -131,7 +131,20 @@ def test_pages_and_api_set_privacy_headers() -> None:
     assert index.status_code == 200
     assert "TAKEOFF" in index.text
     assert health.json() == {"status": "ok"}
-    assert len(roles.json()["roles"]) == 5
+    role_payload = roles.json()
+    assert role_payload["briefing"]
+    assert role_payload["mechanics"] == {
+        "turns": 6,
+        "target": 7,
+        "reasons_max": 3,
+    }
+    assert len(role_payload["roles"]) == 5
+    assert all(role["label"] for role in role_payload["roles"])
+    serialized_roles = roles.text
+    for actor in build_scenario().actors:
+        assert actor.private_brief not in serialized_roles
+        for objective in actor.objectives:
+            assert objective not in serialized_roles
     for response in (index, health, roles):
         assert response.headers["referrer-policy"] == "no-referrer"
         assert response.headers["x-content-type-options"] == "nosniff"

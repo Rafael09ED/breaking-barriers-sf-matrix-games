@@ -44,9 +44,24 @@ a { color: inherit; }
 h1, h2, p { margin-top: 0; }
 .masthead h1 { font-size: clamp(2.6rem, 12vw, 6rem); line-height: .95; margin: 0 0 22px; }
 .purpose { max-width: 760px; color: var(--muted); font-size: 1rem; }
+.briefing { max-width: 860px; margin: 18px 0 0; color: var(--ink); font-size: .86rem; }
 .section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); }
 .section-heading h1, .section-heading h2 { font-size: .95rem; text-transform: uppercase; color: var(--state); }
 .section-heading span { color: var(--muted); font-size: .72rem; text-align: right; }
+.how-it-works { margin-bottom: 44px; }
+.game-loop {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-bottom: 1px solid var(--line);
+}
+.game-loop li { min-width: 0; padding: 18px 18px 20px 0; }
+.game-loop li + li { padding-left: 18px; border-left: 1px solid var(--line); }
+.game-loop span { display: block; margin-bottom: 12px; color: var(--signal); font-size: .7rem; }
+.game-loop strong { display: block; margin-bottom: 8px; font-size: .82rem; text-transform: uppercase; }
+.game-loop p { margin: 0; color: var(--muted); font-size: .74rem; }
 .role-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
 .role-button {
   min-height: 132px;
@@ -61,7 +76,9 @@ h1, h2, p { margin-top: 0; }
 }
 .role-button:hover, .role-button:focus-visible { background: var(--panel); outline: 2px solid var(--signal); outline-offset: -2px; }
 .role-button strong { display: block; color: var(--signal); font-size: 1.15rem; margin-bottom: 12px; }
+.role-button small { display: block; margin: -8px 0 10px; color: var(--state); font-size: .65rem; }
 .role-button span { color: var(--muted); font-size: .82rem; }
+.selection-note { max-width: 780px; margin-top: 18px; color: var(--muted); font-size: .72rem; }
 .error, .feedback { color: var(--fail); }
 
 .game-header {
@@ -100,6 +117,7 @@ h1, h2, p { margin-top: 0; }
 .status-line, .composer-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .status-line { color: var(--signal); font-size: .75rem; margin-bottom: 12px; }
 .composer label { display: block; margin-bottom: 8px; font-size: .86rem; }
+.proposal-guide { margin: -3px 0 10px; color: var(--muted); font-size: .7rem; }
 textarea {
   display: block;
   width: 100%;
@@ -124,7 +142,52 @@ button#submit {
   cursor: pointer;
 }
 button:disabled { opacity: .5; cursor: wait; }
-.activity { min-height: 34px; padding: 7px 0; color: var(--muted); font-size: .76rem; }
+.activity-panel {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(360px, 1.25fr);
+  gap: 24px;
+  align-items: center;
+  min-height: 78px;
+  margin-bottom: 18px;
+  padding: 12px 0;
+  border-block: 1px solid var(--line);
+}
+.activity-copy { min-width: 0; }
+.activity-copy span { display: block; color: var(--state); font-size: .68rem; font-weight: 700; }
+.activity-copy strong { display: block; margin-top: 4px; color: var(--ink); font-size: .78rem; overflow-wrap: anywhere; }
+.turn-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; }
+.turn-steps li {
+  position: relative;
+  min-width: 0;
+  padding: 22px 4px 0;
+  color: var(--muted);
+  font-size: .65rem;
+  text-align: center;
+  text-transform: uppercase;
+}
+.turn-steps li::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--line);
+}
+.turn-steps li::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: calc(50% - 5px);
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--line);
+  background: var(--ground);
+}
+.turn-steps li.done { color: var(--pass); }
+.turn-steps li.done::before, .turn-steps li.done::after { border-color: var(--pass); background: var(--pass); }
+.turn-steps li.active { color: var(--signal); font-weight: 700; }
+.turn-steps li.active::after { border-color: var(--signal); background: var(--signal); }
 .game-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 28px; }
 .transcript, .side-rail { min-width: 0; }
 .outcome {
@@ -149,11 +212,19 @@ button:disabled { opacity: .5; cursor: wait; }
 .outcome h2 { margin: 9px 0; font-size: 1rem; color: var(--ink); }
 .outcome ol, .outcome ul { padding-left: 22px; color: var(--muted); font-size: .82rem; }
 .judgment { color: var(--muted); font-size: .75rem; }
-.result { color: var(--pass); font-weight: 700; }
+.intent { color: var(--muted); font-size: .75rem; }
+.result { margin: 13px 0 4px; color: var(--pass); font-size: .74rem; font-weight: 700; }
 .result.failure { color: var(--fail); }
 .narration { margin: 10px 0; }
-.new-fact { color: var(--state); font-size: .8rem; }
+.new-fact { margin: 8px 0; padding-left: 10px; border-left: 2px solid var(--state); color: var(--state); font-size: .8rem; }
 .private-tag { color: var(--signal); }
+.empty-transcript { padding: 24px 14px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: .8rem; }
+.outcome-progress { border-bottom-style: dashed; background: color-mix(in srgb, var(--actor-color) 5%, transparent); }
+.progress-note { margin: 12px 0 0; color: var(--muted); font-size: .74rem; }
+.outcome-details { margin-top: 16px; padding: 10px 0 0; border-top: 1px solid var(--line); border-bottom: 0; }
+.outcome-details summary { color: var(--muted); font-size: .7rem; }
+.outcome-details[open] summary { color: var(--state); }
+.roll-line { margin: 14px 0 2px; color: var(--state); font-size: .7rem; overflow-wrap: anywhere; }
 details { border-bottom: 1px solid var(--line); padding: 14px 0; }
 summary { cursor: pointer; color: var(--state); font-size: .8rem; text-transform: uppercase; }
 summary span { float: right; color: var(--muted); }
@@ -161,18 +232,27 @@ summary span { float: right; color: var(--muted); }
 .facts li, .objectives li { margin: 10px 0; overflow-wrap: anywhere; }
 .fact-private { color: var(--signal); }
 .side-rail p { margin-top: 14px; color: var(--muted); font-size: .78rem; }
+.side-rail h2 { margin: 18px 0 4px; color: var(--ink); font-size: .68rem; text-transform: uppercase; }
+.side-rail .briefing-note { color: var(--state); font-size: .68rem; }
+.guide-steps { padding-left: 23px; color: var(--muted); font-size: .74rem; }
+.guide-steps li { margin: 10px 0; }
+.guide-steps strong { color: var(--ink); }
 
 @media (max-width: 720px) {
   .start-shell, .game-shell { width: min(100% - 24px, 1180px); padding-top: 16px; }
   .game-header div { gap: 10px; }
+  .game-loop { grid-template-columns: 1fr 1fr; }
+  .game-loop li:nth-child(3) { border-left: 0; border-top: 1px solid var(--line); }
+  .game-loop li:nth-child(4) { border-top: 1px solid var(--line); }
   .game-layout { display: flex; flex-direction: column; gap: 12px; }
   .composer { margin-inline: -4px; padding: 13px; }
   .composer-actions { align-items: flex-end; }
   .composer-actions span { max-width: 55%; }
   button#submit { min-height: 44px; }
-  .side-rail { order: -1; }
+  .activity-panel { grid-template-columns: 1fr; gap: 8px; min-height: 118px; }
+  .side-rail { order: 1; }
   .side-rail details:not([open]) { padding: 10px 0; }
-  .transcript { order: 1; }
+  .transcript { order: 0; }
   .role-list { grid-template-columns: 1fr; }
   .role-button { min-height: 100px; border-right: 0; }
 }

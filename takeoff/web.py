@@ -16,6 +16,14 @@ from takeoff.web_sessions import (
 
 STATIC_DIR = Path(__file__).with_name("static")
 
+ROLE_LABELS = {
+    ActorId.CEO: "OpenBrain CEO",
+    ActorId.ALIGN: "Alignment Lead",
+    ActorId.POTUS: "US President & NSC",
+    ActorId.CHINA: "DeepCent Leadership",
+    ActorId.AGENT4: "Agent-4",
+}
+
 
 class CreateGameRequest(BaseModel):
     actor_id: ActorId
@@ -55,8 +63,18 @@ def create_app(registry: SessionRegistry) -> FastAPI:
         scenario = build_scenario()
         return {
             "purpose": scenario.purpose,
+            "briefing": scenario.briefing,
+            "mechanics": {
+                "turns": scenario.rules.turns,
+                "target": scenario.rules.target,
+                "reasons_max": scenario.rules.reasons_max,
+            },
             "roles": [
-                {"id": actor.id.value, "brief": actor.public_brief}
+                {
+                    "id": actor.id.value,
+                    "label": ROLE_LABELS[actor.id],
+                    "brief": actor.public_brief,
+                }
                 for actor in scenario.actors
             ],
         }

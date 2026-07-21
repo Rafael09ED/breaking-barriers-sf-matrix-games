@@ -1,5 +1,7 @@
 from threading import Thread
 
+import pytest
+
 from takeoff.controllers import ProposalResult
 from takeoff.models import ActorId, Argument
 from takeoff.openrouter import ModelOutputError
@@ -26,6 +28,17 @@ class RecordingParser:
             ),
             attempts=1,
         )
+
+
+@pytest.mark.parametrize("submission", ["", "   ", "\n\t"])
+def test_web_human_controller_rejects_blank_submission(submission: str) -> None:
+    parser = RecordingParser()
+    controller = WebHumanController(parser)
+
+    with pytest.raises(ValueError, match="submission text is required"):
+        controller.submit("submission-1", submission)
+
+    assert parser.submissions == []
 
 
 def run_proposal(controller, context, results):

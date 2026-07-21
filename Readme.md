@@ -25,9 +25,10 @@ recovered.
 1. Open the live demo and choose one of five roles: OpenBrain's CEO, its alignment
 	lead, the US President and NSC, China's DeepCent leadership, or Agent-4. The
 	other four roles are controlled by LLMs.
-2. Read **Established facts** and expand **Your role** to see your private brief
-	and objectives. Make decisions from what your actor knows, not from the full
-	AI 2027 narrative.
+2. Read **Established facts** and expand **Your mission** to see your private brief
+	and success criteria. These are the same strategic instructions and objectives
+	used when an LLM controls that actor. Make decisions from what your actor knows,
+	not from the full AI 2027 narrative.
 3. On your turn, use the single text box to state **one action**, the **result you
 	want**, and **one to three reasons** it should work. For example: "I run a
 	focused audit to produce evidence of deceptive reasoning because the latest
@@ -37,9 +38,11 @@ recovered.
 	game schema. The umpire weighs the supporting case against concrete risks;
 	code then rolls 2d6 with the resulting modifier. A total of 7 or more usually
 	succeeds, while a natural 2 always fails.
-5. Read the outcome and newly established facts at the top of the transcript.
-	These facts constrain every later move, so adapt your strategy rather than
-	repeating an argument the world has made obsolete.
+5. Follow the live **Propose → Judge → Roll → Commit** tracker while the other
+	actors and umpire work. Once resolved, each entry leads with the outcome and
+	newly established facts. Expand **Why this happened** to inspect the reasons,
+	risks, modifier, and dice. Established facts constrain every later move, so
+	adapt your strategy rather than repeating an argument the world has made obsolete.
 6. If you hold a fail chit and want it used for a reroll, explicitly say so in
 	your next submission. The umpire may classify plausibly concealed actions as
 	covert; only information known to your role appears in your view.
@@ -129,11 +132,37 @@ payloads to `takeoff-prompts.jsonl` for secrecy audits. This file can contain
 actor private briefs and covert facts, is ignored by Git, and should not be
 shared.
 
+### Live human-input parser matrix
+
+The normal test suite never calls a model provider. To evaluate how the configured
+OpenRouter models handle realistic, incomplete, random, and adversarial text-box
+submissions, run the opt-in live matrix:
+
+```bash
+uv run pytest --run-live -m live -s tests/test_human_parser_live.py
+```
+
+This is a paid, network-dependent diagnostic and requires `OPENROUTER_API_KEY` in
+`.env`. It sends every nonblank case through the production strict-schema human
+parser and prints the exact extracted action, intended result, reasons, retry
+count, and fail-chit decision, or the final parser error. A small subset is then
+sent to the production umpire to distinguish structural parsing from game
+acceptance. Parser acceptance alone does not mean an action is bounded,
+on-scenario, consistent with established facts, or accepted by the game.
+
+The live test asserts only stable schema and fail-chit safety invariants; exact
+wording, accept/reject rates, and umpire judgments are reported rather than made
+brittle test expectations. Blank and whitespace-only submissions are rejected
+before OpenRouter by the web controller and remain covered by deterministic tests.
+
 ## Web demo
 
 The lightweight web version lets one visitor play any role while the remaining
 four roles use the configured LLM player. It uses the same umpire, dice, ledger,
-and visibility rules as the CLI. Start it locally with:
+and visibility rules as the CLI. Before role selection it explains the core turn
+loop without revealing private doctrine. After selection, the mission panel shows
+the chosen actor's exact private briefing and success criteria. Start it locally
+with:
 
 ```bash
 uv run takeoff-web
@@ -144,12 +173,16 @@ and reasons in the single turn box. To spend a held fail chit, say so in that
 submission. A low-temperature model extracts the text into the normal proposal
 schema; an invalid extraction is retried once and then returns the original draft
 for revision without changing game state. An umpire veto does the same with the
-veto reason attached.
+veto reason attached. During model work, a live tracker identifies the active
+actor and safe processing stage. Other actors' proposal text remains hidden until
+the umpire has classified its visibility.
 
 The browser polls a purpose-built projection rather than raw transcript events.
 It receives public outcomes, facts visible to the selected actor, and that actor's
-own covert outcomes. Other actors' covert material and unrealized outcome branches
-remain server-side.
+own covert outcomes. Resolved entries emphasize intent, consequence, and changed
+facts; the complete supporting case, umpire risks, score, modifier, and roll remain
+available under **Why this happened**. Other actors' covert material and unrealized
+outcome branches remain server-side.
 
 This deployment is intentionally ephemeral for a short demonstration. Games live
 in one Python process, secret game URLs are bearer access to a role's private

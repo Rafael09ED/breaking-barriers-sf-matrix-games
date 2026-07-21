@@ -13,13 +13,27 @@
       <p class="eyebrow">AI 2027 MATRIX GAME</p>
       <h1>TAKEOFF</h1>
       <p id="purpose" class="purpose">Loading scenario...</p>
+      <p id="briefing" class="briefing"></p>
     </header>
+    <section class="how-it-works" aria-labelledby="game-loop-title">
+      <div class="section-heading">
+        <h2 id="game-loop-title">How the game works</h2>
+        <span id="rules-summary"></span>
+      </div>
+      <ol class="game-loop">
+        <li><span>01</span><strong>Choose a role</strong><p>You control one actor. Four persona-conditioned LLMs control the others.</p></li>
+        <li><span>02</span><strong>Make one argument</strong><p>State one action, the result you want, and one to three reasons it should work.</p></li>
+        <li><span>03</span><strong>Face the umpire</strong><p>The umpire weighs your support against concrete risks and sets a modifier.</p></li>
+        <li><span>04</span><strong>Change the world</strong><p>Code rolls 2d6. Success or failure commits new facts that constrain every later move.</p></li>
+      </ol>
+    </section>
     <section aria-labelledby="choose-role">
       <div class="section-heading">
         <h2 id="choose-role">Choose your role</h2>
         <span>Four other roles are played by LLMs</span>
       </div>
       <div id="roles" class="role-list" aria-live="polite"></div>
+      <p class="selection-note">Your private knowledge, incentives, and success criteria are revealed after you choose. They are the same instructions used when an LLM controls that role.</p>
       <p id="start-error" class="error" hidden></p>
     </section>
   </main>

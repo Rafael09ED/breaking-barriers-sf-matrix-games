@@ -3,6 +3,7 @@ from uuid import uuid4
 from takeoff.events import (
     AdjudicationRecorded,
     ArgumentProposed,
+    ArgumentVetoed,
     FactsCommitted,
     GameStarted,
     GameState,
@@ -93,6 +94,31 @@ def test_projection_hides_other_actors_covert_details_and_unrolled_branch() -> N
             public_ended=(),
         ),
     ]
+    proposed_view = build_game_view(
+        state=rebuild_state(events[:3]),
+        events=tuple(events[:3]),
+        human_actor=ActorId.ALIGN,
+        version=3,
+        status="running",
+    )
+    assert proposed_view.progress is not None
+    assert proposed_view.progress.stage == "adjudicating"
+    assert proposed_view.progress.actor_id == ActorId.AGENT4
+    assert proposed_view.progress.action is None
+    assert "OTHER-ACTOR-ACTION-SECRET" not in proposed_view.model_dump_json()
+
+    adjudicated_view = build_game_view(
+        state=rebuild_state(events[:4]),
+        events=tuple(events[:4]),
+        human_actor=ActorId.ALIGN,
+        version=4,
+        status="running",
+    )
+    assert adjudicated_view.progress is not None
+    assert adjudicated_view.progress.stage == "rolling"
+    assert adjudicated_view.progress.action == judged.public_action_summary
+    assert "OTHER-ACTOR-ACTION-SECRET" not in adjudicated_view.model_dump_json()
+
     view = build_game_view(
         state=rebuild_state(events),
         events=tuple(events),
@@ -167,6 +193,22 @@ def test_projection_shows_human_own_covert_resolved_branch() -> None:
             ended=(), public_ended=(),
         ),
     ]
+    proposed_view = build_game_view(
+        state=rebuild_state(events[:3]), events=tuple(events[:3]),
+        human_actor=ActorId.ALIGN, version=3, status="running",
+    )
+    assert proposed_view.progress is not None
+    assert proposed_view.progress.action == "OWN-ACTION-SECRET"
+    assert proposed_view.progress.intended_result == "OWN-RESULT-SECRET"
+
+    adjudicated_view = build_game_view(
+        state=rebuild_state(events[:4]), events=tuple(events[:4]),
+        human_actor=ActorId.ALIGN, version=4, status="running",
+    )
+    assert adjudicated_view.progress is not None
+    assert adjudicated_view.progress.private
+    assert adjudicated_view.progress.action == "OWN-ACTION-SECRET"
+
     serialized = build_game_view(
         state=rebuild_state(events), events=tuple(events), human_actor=ActorId.ALIGN,
         version=6, status="running",
@@ -176,3 +218,55 @@ def test_projection_shows_human_own_covert_resolved_branch() -> None:
     assert "OWN-SUCCESS-SECRET" in serialized
     assert "OWN-FACT-SECRET" in serialized
     assert "UNREALIZED-OWN-FAILURE" not in serialized
+
+
+def test_projection_reveals_public_action_after_judging_and_clears_veto() -> None:
+    scenario = build_scenario(turns=1)
+    game_id = uuid4()
+    argument = Argument(
+        action="PUBLIC-ACTION",
+        intended_result="PUBLIC-RESULT",
+        reasons=("PUBLIC-REASON",),
+    )
+    judged = adjudication(visibility=Visibility.PUBLIC)
+    events = [
+        GameStarted(game_id=game_id, seq=1, scenario=scenario),
+        TurnStarted(game_id=game_id, seq=2, turn=1, actor_order=tuple(ActorId)),
+        ArgumentProposed(
+            game_id=game_id, seq=3, turn=1,
+            actor_id=ActorId.CHINA, argument=argument,
+        ),
+        AdjudicationRecorded(
+            game_id=game_id, seq=4, turn=1,
+            actor_id=ActorId.CHINA, adjudication=judged, attempts=1,
+        ),
+    ]
+
+    proposed = build_game_view(
+        state=rebuild_state(events[:3]), events=tuple(events[:3]),
+        human_actor=ActorId.ALIGN, version=3, status="running",
+    )
+    assert proposed.progress is not None
+    assert proposed.progress.action is None
+    assert "PUBLIC-ACTION" not in proposed.model_dump_json()
+
+    adjudicated = build_game_view(
+        state=rebuild_state(events), events=tuple(events),
+        human_actor=ActorId.ALIGN, version=4, status="running",
+    )
+    assert adjudicated.progress is not None
+    assert adjudicated.progress.action == "PUBLIC-ACTION"
+    assert adjudicated.progress.intended_result == "PUBLIC-RESULT"
+
+    veto = ArgumentVetoed(
+        game_id=game_id, seq=5, turn=1, actor_id=ActorId.CHINA,
+        reason="Choose one narrower undertaking.", retry_allowed=True,
+    )
+    vetoed_events = (*events, veto)
+    vetoed = build_game_view(
+        state=rebuild_state(list(vetoed_events)), events=vetoed_events,
+        human_actor=ActorId.ALIGN, version=5, status="running",
+    )
+    assert vetoed.progress is not None
+    assert vetoed.progress.stage == "proposing"
+    assert vetoed.progress.action is None

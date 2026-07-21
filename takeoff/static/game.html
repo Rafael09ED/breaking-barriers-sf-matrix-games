@@ -22,7 +22,8 @@
     <section id="composer" class="composer" aria-labelledby="composer-label" hidden>
       <div class="status-line"><span id="composer-label">YOUR TURN</span><span id="chits"></span></div>
       <p id="feedback" class="feedback" hidden></p>
-      <label for="proposal">Describe your action, desired result, and reasons.</label>
+      <label for="proposal">What do you do?</label>
+      <p class="proposal-guide"><strong>Include:</strong> one bounded action · one desired result · one to three situation-specific reasons</p>
       <textarea id="proposal" rows="7" placeholder="I run a focused audit to produce evidence because the latest interpretability results remain ambiguous. Spend my fail chit if needed."></textarea>
       <div class="composer-actions">
         <span id="input-note">The umpire decides whether the action is covert.</span>
@@ -30,11 +31,23 @@
       </div>
     </section>
 
-    <div id="activity" class="activity" role="status">Starting game...</div>
+    <section id="activity-panel" class="activity-panel" aria-labelledby="activity-actor">
+      <div class="activity-copy">
+        <span id="activity-actor">GAME SETUP</span>
+        <strong id="activity" role="status" aria-live="polite">Starting game...</strong>
+      </div>
+      <ol id="turn-steps" class="turn-steps" aria-label="Turn progress">
+        <li data-stage="proposing">Propose</li>
+        <li data-stage="adjudicating">Judge</li>
+        <li data-stage="rolling">Roll</li>
+        <li data-stage="committing">Commit</li>
+      </ol>
+    </section>
 
     <div class="game-layout">
       <section class="transcript" aria-labelledby="transcript-title">
-        <div class="section-heading"><h1 id="transcript-title">Game transcript</h1><span id="outcome-count">0 outcomes</span></div>
+        <div class="section-heading"><h1 id="transcript-title">Latest developments</h1><span id="outcome-count">0 outcomes</span></div>
+        <p id="empty-transcript" class="empty-transcript">No actions have resolved yet. The first actor is preparing a move.</p>
         <div id="outcomes" class="outcomes" aria-live="polite"></div>
       </section>
 
@@ -43,10 +56,25 @@
           <summary>Established facts <span id="fact-count">0</span></summary>
           <ol id="facts" class="facts"></ol>
         </details>
-        <details>
-          <summary>Your role</summary>
+        <details open>
+          <summary>Your mission</summary>
+          <h2>Your role</h2>
+          <p id="public-brief"></p>
+          <h2>What you know &amp; your incentives</h2>
           <p id="private-brief"></p>
+          <h2>Your success criteria</h2>
           <ul id="objectives" class="objectives"></ul>
+          <p class="briefing-note">This is the same strategic context used when an LLM controls this actor.</p>
+        </details>
+        <details>
+          <summary>How this works</summary>
+          <p id="shared-briefing"></p>
+          <ol class="guide-steps">
+            <li><strong>Propose:</strong> an actor makes one bounded argument.</li>
+            <li><strong>Judge:</strong> the umpire weighs support against risks.</li>
+            <li><strong>Roll:</strong> code rolls 2d6 plus the modifier; 7 usually succeeds.</li>
+            <li><strong>Commit:</strong> the result becomes established fact.</li>
+          </ol>
         </details>
       </aside>
     </div>

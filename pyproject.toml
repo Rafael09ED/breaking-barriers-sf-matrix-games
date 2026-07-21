@@ -31,3 +31,6 @@ packages = ["takeoff"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "live: makes paid, nondeterministic calls to external model providers",
+]
